@@ -376,6 +376,8 @@ label select{display:block;width:100%;margin-top:6px}
 /* sem zoom de toque duplo; campos com 16px para o iPhone não ampliar ao focar */
 html,body{touch-action:manipulation}
 input,select,textarea{font-size:16px}
+.tlink{cursor:pointer}
+tr.tlink:active td{background:var(--accent-soft)}
 
 </style>
 
@@ -1725,7 +1727,7 @@ function renderClube(){
     ${myComps().map(c=>`<button class="pick" data-a="seecomp" data-v="${c.id}"><span class="info"><span class="nm">${esc(c.n)}</span><span class="mt">${esc(compStatus(c,S.me))}</span></span>${c.champ===S.me?'<span class="st-tag">🏆</span>':''}</button>`).join('')||'<p class="small mute">Seu clube não disputa competições nesta temporada.</p>'}
   </div>
   <div class="card"><h3>Calendário</h3>
-    ${up.map(u=>`<div class="calr"><span class="cd"><b>${dLabel(S.cal[u.d])}</b><small>${esc(u.c.s)}${u.rn?' · '+esc(u.rn):''}</small></span><span class="ha ${u.tbd?'':u.h===S.me?'h':'a'}">${u.tbd?'—':u.h===S.me?'casa':'fora'}</span><span class="op">${u.tbd?'<span class="mute">a definir</span>':`${crest(u.h===S.me?u.a:u.h,22)}<span>${esc(T(u.h===S.me?u.a:u.h).name)}</span>`}</span></div>`).join('')||'<p class="small mute">Nada agendado.</p>'}
+    ${up.map(u=>`<div class="calr"><span class="cd"><b>${dLabel(S.cal[u.d])}</b><small>${esc(u.c.s)}${u.rn?' · '+esc(u.rn):''}</small></span><span class="ha ${u.tbd?'':u.h===S.me?'h':'a'}">${u.tbd?'—':u.h===S.me?'casa':'fora'}</span><span class="op tlink" ${u.tbd?'':`data-a="team" data-v="${u.h===S.me?u.a:u.h}"`}>${u.tbd?'<span class="mute">a definir</span>':`${crest(u.h===S.me?u.a:u.h,22)}<span>${esc(T(u.h===S.me?u.a:u.h).name)}</span>`}</span></div>`).join('')||'<p class="small mute">Nada agendado.</p>'}
     ${last.length?`<p class="tiny mute" style="font-weight:700;margin-top:8px">ÚLTIMOS RESULTADOS</p>${last.map(r=>`<div class="fx"><span class="h">${esc(T(r.h).name)} ${crest(r.h,20)}</span><span class="sc">${r.gh}–${r.ga}</span><span class="a">${crest(r.a,20)} ${esc(T(r.a).name)}</span></div><p class="tiny mute" style="text-align:center;margin-top:-4px">${esc(compMeta(r.c).s)}${r.pen?` · pênaltis ${r.pen[0]}–${r.pen[1]}`:''}${r.agg&&!r.pen?` · agregado ${r.agg[0]}–${r.agg[1]}`:''}</p>`).join('')}`:''}
   </div>
   ${S.inbox.length?`<div class="card"><h3>Propostas recebidas</h3>${S.inbox.map(o=>{const p=P(o.pid);return `<div class="offer"><div class="row">${crest(o.from,32)}<p class="grow small"><b>${esc(T(o.from).name)}</b> quer <b>${esc(p.n)}</b> <span class="mute">(${p.p}, ${p.o})</span></p></div><div class="kv"><span>Oferta</span><b>${money(o.amt)}</b></div><div class="kv mute small"><span>Valor de mercado</span><span>${money(value(p))}</span></div><div class="row"><button class="btn pri sm grow" data-a="acc" data-v="${o.id}">Aceitar</button><button class="btn sm grow" data-a="rej" data-v="${o.id}">Recusar</button></div><p class="tiny mute">Expira em ${dLabel(S.cal[Math.min(o.exp,S.cal.length-1)])}</p></div>`}).join('')}</div>`:''}
@@ -1805,7 +1807,7 @@ function rrTable(c,st,g,gi){
   const rows=groupTable(g);const n=rows.length;const multi=st.groups.length>1;const q=c.stages[c.done.concat(c.st?[c.st]:[]).indexOf(st)+1];
   const qn=q&&q.t==='ko'?Math.floor(q.from.size/st.groups.length):q&&q.from&&q.from.k==='top'?q.from.n:0;
   return `<div class="card">${multi?`<h3>Grupo ${String.fromCharCode(65+gi)}</h3>`:''}<div class="tblw"><table class="tbl"><thead><tr><th class="l">#</th><th class="l">Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>SG</th></tr></thead><tbody>
-    ${rows.map((r,i)=>{const z=c.stages.length>1?(i<qn?'z1':'z0'):zcls(c,i,n);return `<tr class="${r.id===S.me?'me':''}"><td class="l"><span class="zn ${z}"></span>${i+1}</td><td class="l"><span class="tm">${crest(r.id,22)}${esc(T(r.id).name)}</span></td><td><b>${r.P}</b></td><td>${r.J}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td><td>${r.GP-r.GC}</td></tr>`}).join('')}
+    ${rows.map((r,i)=>{const z=c.stages.length>1?(i<qn?'z1':'z0'):zcls(c,i,n);return `<tr class="${r.id===S.me?'me':''} tlink" data-a="team" data-v="${r.id}"><td class="l"><span class="zn ${z}"></span>${i+1}</td><td class="l"><span class="tm">${crest(r.id,22)}${esc(T(r.id).name)}</span></td><td><b>${r.P}</b></td><td>${r.J}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td><td>${r.GP-r.GC}</td></tr>`}).join('')}
   </tbody></table></div></div>`;
 }
 function legend(c){
@@ -1823,7 +1825,7 @@ function koView(c,st){
       if(t.bye)return `<div class="fx"><span class="h">${esc(tname(t.a))} ${crest(t.a,20)}</span><span class="sc tiny">folga</span><span class="a"></span></div>`;
       const me=t.a===S.me||t.b===S.me;const played=(t.legs||[]).length;
       const sc=played?`${t.ga}–${t.gb}`:'×';
-      return `<div class="fx ${me?'me':''}"><span class="h" style="${t.w===t.a?'font-weight:800':''}">${esc(tname(t.a))} ${crest(t.a,20)}</span><span class="sc">${sc}</span><span class="a" style="${t.w===t.b?'font-weight:800':''}">${crest(t.b,20)} ${esc(tname(t.b))}</span></div>${t.pen?`<p class="tiny mute" style="text-align:center;margin-top:-4px">pênaltis ${t.pen[0]}–${t.pen[1]}</p>`:played&&rd.legs>1&&played<rd.legs?`<p class="tiny mute" style="text-align:center;margin-top:-4px">jogo de ida</p>`:''}`}).join('')}</div>`}).reverse().join('');
+      return `<div class="fx ${me?'me':''}"><span class="h tlink" data-a="team" data-v="${t.a}" style="${t.w===t.a?'font-weight:800':''}">${esc(tname(t.a))} ${crest(t.a,20)}</span><span class="sc">${sc}</span><span class="a tlink" data-a="team" data-v="${t.b}" style="${t.w===t.b?'font-weight:800':''}">${crest(t.b,20)} ${esc(tname(t.b))}</span></div>${t.pen?`<p class="tiny mute" style="text-align:center;margin-top:-4px">pênaltis ${t.pen[0]}–${t.pen[1]}</p>`:played&&rd.legs>1&&played<rd.legs?`<p class="tiny mute" style="text-align:center;margin-top:-4px">jogo de ida</p>`:''}`}).join('')}</div>`}).reverse().join('');
 }
 function distView(){
   const R_={};
@@ -1832,7 +1834,7 @@ function distView(){
     const c=S.comps['E-'+u];const rk=c?compRanking(c):[];const pos=id=>{const i=rk.indexOf(id);return i<0?99:i};
     ids.sort((a,b)=>pos(a)-pos(b)||T(b).rep-T(a).rep);
     const q=S.quota.D[u]||0;const abc=new Set([...S.P.A,...S.P.B,...S.P.C]);const zone=new Set(rk.filter(id=>!abc.has(id)).slice(0,q));
-    return `<div class="card"><div class="card-h"><h3>${STN[u]}</h3><span class="tiny mute">${q} vaga${q>1?'s':''} na Série D</span></div>${ids.map(id=>`<div class="kv small ${id===S.me?'me':''}"><span class="tm" style="display:flex;gap:6px;align-items:center">${crest(id,20)}${esc(T(id).name)}</span><span class="${zone.has(id)?'up':'mute'}" style="font-weight:${zone.has(id)?700:400}">${pos(id)<99?(pos(id)+1)+'º no estadual':'fora do estadual'}${zone.has(id)?' · vaga na D':''}</span></div>`).join('')}</div>`}).join('');
+    return `<div class="card"><div class="card-h"><h3>${STN[u]}</h3><span class="tiny mute">${q} vaga${q>1?'s':''} na Série D</span></div>${ids.map(id=>`<div class="kv small tlink ${id===S.me?'me':''}" data-a="team" data-v="${id}"><span class="tm" style="display:flex;gap:6px;align-items:center">${crest(id,20)}${esc(T(id).name)}</span><span class="${zone.has(id)?'up':'mute'}" style="font-weight:${zone.has(id)?700:400}">${pos(id)<99?(pos(id)+1)+'º no estadual':'fora do estadual'}${zone.has(id)?' · vaga na D':''}</span></div>`).join('')}</div>`}).join('');
 }
 function renderTabela(){
   if(!UI.tc||(UI.tc!=='DIST'&&!S.comps[UI.tc]))UI.tc=T(S.me).main&&S.comps[T(S.me).main]?T(S.me).main:'A';
@@ -1848,7 +1850,7 @@ function renderTabela(){
   }
   if(sub==='rod'){
     const fx=c.fin?[]:(()=>{const st=c.st;if(st.t==='rr')return st.groups.flatMap(g=>g.sch[st.j]||[]);const rd=st.rounds[st.r];return rd.ties?rd.ties.filter(t=>!t.bye).map(t=>st.l===0?[t.a,t.b]:[t.b,t.a]):[]})();
-    const line=(h,a,s)=>`<div class="fx ${h===S.me||a===S.me?'me':''}"><span class="h">${esc(T(h).name)} ${crest(h,22)}</span><span class="sc">${s}</span><span class="a">${crest(a,22)} ${esc(T(a).name)}</span></div>`;
+    const line=(h,a,s)=>`<div class="fx ${h===S.me||a===S.me?'me':''}"><span class="h tlink" data-a="team" data-v="${h}">${esc(T(h).name)} ${crest(h,22)}</span><span class="sc">${s}</span><span class="a tlink" data-a="team" data-v="${a}">${crest(a,22)} ${esc(T(a).name)}</span></div>`;
     const last=c.last||[];
     return sel+seg+head+(last.length?`<div class="card"><h3>Últimos resultados · ${dLabel(S.cal[c.lastD])}</h3>${last.map(m=>line(m[0],m[1],`${m[2]}–${m[3]}`)).join('')}</div>`:'')+(fx.length?`<div class="card"><h3>Próximos jogos · ${dLabel(S.cal[c.dates[c.k]])}</h3>${fx.map(([h,a])=>line(h,a,'×')).join('')}</div>`:'<div class="card"><p class="small mute">Sem jogos agendados.</p></div>');
   }
@@ -2082,7 +2084,8 @@ function openPlayer(pid){
       <p class="hint">Chance de aceite: baixa ≈ 10%, pedida ≈ 50%, cobrindo é garantido, desde que o clube tenha mais de 18 jogadores.</p>`;
   }
   const d=p.o-p.o0;
-  openSheet(p.n,`
+  const back=UI.backTeam&&p.t===UI.backTeam&&p.t!==S.me?`<button class="btn sm ghost" data-a="team" data-v="${p.t}" style="align-self:flex-start">← Elenco do ${esc(T(p.t).name)}</button>`:'';
+  openSheet(p.n,`${back}
     <div class="row" style="gap:14px"><span class="big-ovr ovr ${tier(p.o)}">${p.o}</span><div class="grow"><div class="row" style="gap:6px">${rpill(p.p)}${p.p2?rpill(p.p2):''}${crest(p.t,24)}<span class="small mute">${p.t?esc(T(p.t).name):'Sem clube'}</span></div><p class="small" style="margin-top:6px">${roleTxt(p)}</p><p class="small">Nível ${starsHTML(p)} <span class="mute">· potencial ≈ ${potRange(p)}</span>${p.prom?' <span class="flag sal">💎 Promessa</span>':''}</p></div></div>
     <div class="pstat">
       <div><small>Idade</small><b>${p.a}</b></div><div><small>Na temporada</small><b class="${d>0?'up':d<0?'dn':''}">${d>0?'+':''}${d}</b></div><div><small>Valor</small><b>${money(value(p))}</b></div>
@@ -2103,6 +2106,23 @@ function openPlayer(pid){
       </div>
       <button class="btn sm" style="margin-top:10px" data-a="edsave" data-v="${p.id}">Salvar alterações</button>
     </details>`);
+}
+
+/* ==================== ELENCO DE OUTRO CLUBE ==================== */
+function openTeam(id){
+  const t=T(id);if(!t)return;if(id===S.me){closeSheet();UI.tab='elenco';render();return}
+  UI.backTeam=id;const sq=squad(id);const ri_=rankInfo(id);const mc=S.comps[t.main];
+  const xi=new Set(aiOn(id).map(x=>x[1]));
+  const comps=Object.values(S.comps).filter(c=>inComp(c,id));
+  openSheet(t.name,`
+    <div class="row" style="gap:12px">${crest(id,52)}<div class="grow"><p class="small"><b>${divLabel(t.div)}</b>${STN[t.reg]?' · '+STN[t.reg]:EXN[t.reg]?' · '+EXN[t.reg]:''}</p><p class="small mute">Técnico: ${esc(t.coach)}</p><p class="small mute">${esc(t.stad||'Estádio')} · ${t.cap.toLocaleString('pt-BR')} lugares</p></div></div>
+    <div class="pstat">
+      <div><small>Força média</small><b>${teamAvg(id).toFixed(1)}</b></div><div><small>${mc?esc(mc.s):'Liga'}</small><b>${ri_.row&&ri_.row.J?ri_.pos+'º':'—'}</b></div><div><small>Esquema</small><b>${t.form}</b></div>
+      <div><small>Elenco</small><b>${sq.length}</b></div><div><small>Caixa</small><b class="${t.cash<0?'dn':''}" style="font-size:15px">${money(t.cash)}</b></div><div><small>Forma</small><b>${t.last.length?t.last.join(''):'—'}</b></div>
+    </div>
+    ${comps.length?`<p class="tiny mute">${comps.map(c=>`${esc(c.s)}: ${esc(compStatus(c,id))}`).join(' · ')}</p>`:''}
+    <p class="tiny mute" style="font-weight:700">ELENCO · ● = titular provável · toque no jogador para detalhes e proposta</p>
+    <div class="list">${['G','D','M','A'].map(g=>{const gr=sq.filter(p=>GRP[p.p]===g).sort((a,b)=>ROLES.indexOf(a.p)-ROLES.indexOf(b.p)||b.o-a.o);return gr.length?`<div class="grp">${GRPL[g]}</div>`+gr.map(p=>`<div class="pr ${avail(p)?'':'out'}" data-a="pl" data-v="${p.id}">${rpill(p.p)}<div class="info"><span class="nm">${xi.has(p.id)?'<b style="color:var(--accent)">●</b> ':''}${esc(p.n)}${p.prom?' 💎':''}${p.inj?' <span class="flag inj">Lesão</span>':''}${p.sus?' <span class="flag inj">Suspenso</span>':''}</span><span class="mt">${starsHTML(p)} · ${p.a} anos${p.p2?' · '+p.p2:''} · ${p.j} j · ${p.g} g</span></div><span class="price">${money(value(p))}</span>${ovr(p.o)}</div>`).join(''):''}).join('')}</div>`);
 }
 
 /* ==================== PARTIDA ==================== */
@@ -2302,6 +2322,7 @@ const ACT={
   auto:()=>{S.lineup.xi=assign(S.me,myRoles());save();render();toast(`Melhores escalados no ${formName()}.`)},
   tac:v=>{S.lineup.tac=v;save();render()},
   pl:v=>openPlayer(+v),
+  team:v=>openTeam(v),
   close:()=>{closeSheet();if(S&&S.fired)render()},
   bg:(v,el,e)=>{if(Date.now()<NOBG)return;if(e.target===el){closeSheet();if(S&&S.fired)render()}},
   aucgo:v=>{const min=parseFloat(($('#auc').value||'').replace(',','.'));if(!(min>0))return toast('Informe um preço mínimo válido.');if(openAuction(+v,min)===false)return;save();render();openPlayer(+v);toast(inWindow()?'Leilão aberto: os lances chegam a cada data.':'Leilão criado: começa quando a janela abrir.')},
@@ -2477,6 +2498,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="15";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="16";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
