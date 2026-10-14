@@ -1041,7 +1041,7 @@ function startRound(){
     all.push([c,res]);
   }
   const myC=all.find(([c,res])=>res.includes(mine));
-  MS={rel:benchList(true).map(p=>p.id),all,ms:myC[1],c:myC[0],mine,live:true,speed:1,paused:false,half:false,timer:null,selOut:null,selIn:null,done:false};
+  MS={rel:benchList(true).map(p=>p.id),all,ms:myC[1],c:myC[0],mine,live:true,speed:S.mspeed||1,paused:false,half:false,timer:null,selOut:null,selIn:null,done:false};
   $('#match').hidden=false;renderMatch();runClock();
 }
 /* simula o seu jogo sem assistir */
@@ -2307,7 +2307,7 @@ const ACT={
   newgame:()=>{if(UI.confirm!=='new'){UI.confirm='new';render();return}try{localStorage.removeItem(KEY)}catch(e){}S=null;UI.confirm=null;closeSheet();render();toast('Jogo salvo apagado.')},
   mpause:()=>{MS.paused=true;clearInterval(MS.timer);renderMatch()},
   mresume:()=>{const m=MS.mine;applyPend();m.gap[S.me].splice(0).forEach(r=>autoSub(m,S.me,r));MS.paused=false;MS.selIn=MS.selOut=null;runClock();renderMatch()},
-  mspeed:()=>{MS.speed=MS.speed===1?2:MS.speed===2?4:1;runClock();renderMatch()},
+  mspeed:()=>{MS.speed=MS.speed===1?2:MS.speed===2?4:1;S.mspeed=MS.speed;runClock();renderMatch()},
   pentk:v=>{const m=MS.mine;const ok=resolvePen(m,S.me,+v);MS.pen=null;toast(ok?'GOL! Pênalti convertido.':'Perdeu o pênalti!');MS.paused=false;runClock();renderMatch()},
   mskip:()=>skipToEnd(),
   mspot:v=>{const m=MS.mine,me=S.me;const [x,y]=v.split(',').map(Number);const e=m.on[me].find(o=>o[1]===MS.selOut);if(!e)return;const r=zoneRole(x,y);
@@ -2438,6 +2438,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="11";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="12";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
