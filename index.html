@@ -719,6 +719,9 @@ input::placeholder{color:#7fb38f}
 .ec-c{text-align:center;font-size:.66rem;color:#a9d6b6}.ec-c.c4,.ec-c.c5{color:#ff8a80}.ec-c.c0,.ec-c.c1{color:#7ee69a}
 .ec-f{text-align:center;font-weight:800;color:#fff}.ec-f.t1{color:#1f1a00;background:#ffe14d;border-radius:3px}.ec-f.t2{color:#ffe14d}
 .ec .ec-p{width:18px;min-width:0!important;max-width:18px;padding:0!important;display:block;line-height:16px;overflow:hidden}
+.ec-f.evu{background:#2f7de1!important;color:#fff!important;border-radius:3px}
+.ec-f.evd{background:#d23b30!important;color:#fff!important;border-radius:3px}
+.big-ovr.evu{background:#2f7de1!important;color:#fff!important}.big-ovr.evd{background:#d23b30!important;color:#fff!important}
 
 </style>
 
@@ -1390,11 +1393,13 @@ function koDecider(m,c){
 }
 function postDate(all){
   const d=S.d;
+  {const pl=new Set();for(const [,res] of all)res.forEach(m=>{pl.add(m.h);pl.add(m.a)});if(pl.has(S.me))(SQ.get(S.me)||[]).forEach(p=>{if(p.evd!==S.d)p.ev=0});S._pl=pl}
   for(const [c,res] of all){
     res.forEach(m=>{matchPost(m,c);m.ev.forEach(e=>{if((e.k==='gol'||e.k==='pg')&&e.id){const g=c.gls||(c.gls={});g[e.id]=(g[e.id]||0)+1}})});
     c.last=res.map(m=>[m.h,m.a,m.gh,m.ga]);c.lastD=d;
     compRecord(c,res);
   }
+  if(S._pl){roundDev([...S._pl]);delete S._pl}
   RKC=null;for(const k in XC)delete XC[k];
   S.players.forEach(p=>{if(p.inj>0)p.inj--});
   Object.values(S.teams).forEach(t=>{
@@ -2106,7 +2111,7 @@ function nextSeason(P1){
 
 /* ==================== SALVAR (compactado) ==================== */
 const KEY='tatico26.v5',OLDKEY='tatico26.save';
-const PF=['id','n','p','p2','o','a','t','pot','w','ct','o0','g','j','inj','sus','sale','prom','gen','h','sgn'];
+const PF=['id','n','p','p2','o','a','t','pot','w','ct','o0','g','j','inj','sus','sale','prom','gen','h','sgn','ev','evd'];
 function packS(){
   const o={...S};o.players=S.players.map(p=>PF.map(k=>k==='w'?Math.round(p.w*1e4)/1e4:k==='sale'?(p.sale?1:0):k==='h'?(p.h||[]).join('.'):p[k]??0));
   return JSON.stringify(o);
@@ -2828,7 +2833,7 @@ function openPlayer(pid){
   const d=p.o-p.o0;
   const back=UI.backTeam&&p.t===UI.backTeam&&p.t!==S.me?`<button class="btn sm ghost" data-a="team" data-v="${p.t}" style="align-self:flex-start">← Elenco do ${esc(T(p.t).name)}</button>`:'';
   openSheet(p.n,`${back}
-    <div class="row" style="gap:14px"><span class="big-ovr ovr ${tier(p.o)}">${FZ(p.o)}</span><div class="grow"><div class="row" style="gap:6px">${rpill(p.p)}${p.p2?rpill(p.p2):''}${crest(p.t,24)}<span class="small mute">${p.t?esc(T(p.t).name):'Sem clube'}</span></div><p class="small" style="margin-top:6px">${roleTxt(p)}</p><p class="small">Nível ${starsHTML(p)} <span class="mute">· potencial ≈ ${potRange(p)}</span>${p.prom?' <span class="flag sal">💎 Promessa</span>':''}</p></div></div>
+    <div class="row" style="gap:14px"><span class="big-ovr ovr ${tier(p.o)} ${p.t===S.me&&p.ev>0?'evu':p.t===S.me&&p.ev<0?'evd':''}">${FZ(p.o)}</span><div class="grow"><div class="row" style="gap:6px">${rpill(p.p)}${p.p2?rpill(p.p2):''}${crest(p.t,24)}<span class="small mute">${p.t?esc(T(p.t).name):'Sem clube'}</span></div><p class="small" style="margin-top:6px">${roleTxt(p)}</p><p class="small">Nível ${starsHTML(p)} <span class="mute">· potencial ≈ ${potRange(p)}</span>${p.prom?' <span class="flag sal">💎 Promessa</span>':''}</p></div></div>
     <div class="pstat">
       <div><small>Idade</small><b>${p.a}</b></div><div><small>Na temporada</small><b class="${d>0?'up':d<0?'dn':''}">${d>0?'+':''}${d}</b></div><div><small>Valor</small><b>${money(value(p))}</b></div>
       <div><small>Salário/mês</small><b>${money(wage(p))}</b></div><div><small>Contrato</small><b>${p.t?p.ct+(p.ct===1?' ano':' anos'):'—'}</b></div><div><small>Jogos</small><b>${p.j}</b></div>
@@ -3516,7 +3521,7 @@ function renderElenco(){
   const rows=ord.map(p=>{const t=on.has(p.id),r=res.has(p.id),g=GRP[p.p];
     const sep=g!==last?`<div class="ec-g">${GRPL[g]}</div>`:'';last=g;
     const fl=p.inj?`<i class="ec-x">L${p.inj}</i>`:p.sus?'<i class="ec-x">S</i>':p.sale?'<i class="ec-x y">$</i>':'';
-    return `${sep}<div class="ec ${t?'t':''} ${r?'r':''} ${avail(p)?'':'out'}"><button class="ec-b ${t?'on':''}" data-a="eltog" data-v="${p.id}" aria-label="Titular">${t?'●':''}</button><button class="ec-b rb ${r?'on':''}" data-a="elres" data-v="${p.id}" ${t?'disabled':''} aria-label="Reserva">${r?'R':''}</button><span class="ec-p pos ${g}">${g}</span><button class="ec-n" data-a="pl" data-v="${p.id}">${esc(p.n)}${isStar(p)?'<i class="star">*</i>':''}${fl}</button><span class="ec-a">${p.a}</span><span class="ec-c c${compOf(p)}">${CA[compOf(p)]}</span><span class="ec-gl">${p.g||''}</span><span class="ec-f ${tier(p.o)}">${FZ(p.o)}</span></div>`}).join('');
+    return `${sep}<div class="ec ${t?'t':''} ${r?'r':''} ${avail(p)?'':'out'}"><button class="ec-b ${t?'on':''}" data-a="eltog" data-v="${p.id}" aria-label="Titular">${t?'●':''}</button><button class="ec-b rb ${r?'on':''}" data-a="elres" data-v="${p.id}" ${t?'disabled':''} aria-label="Reserva">${r?'R':''}</button><span class="ec-p pos ${g}">${g}</span><button class="ec-n" data-a="pl" data-v="${p.id}">${esc(p.n)}${isStar(p)?'<i class="star">*</i>':''}${fl}</button><span class="ec-a">${p.a}</span><span class="ec-c c${compOf(p)}">${CA[compOf(p)]}</span><span class="ec-gl">${p.g||''}</span><span class="ec-f ${tier(p.o)} ${p.ev>0?'evu':p.ev<0?'evd':''}">${FZ(p.o)}</span></div>`}).join('');
   return `${head}
   <div class="ec-top"><span><b>${formName()}</b></span><span>Tit <b class="${n<11?'dn':''}">${n}/11</b></span><span>Res <b>${res.size}/${MAXRES}</b></span><span>Força <b>${avgF.toFixed(1)}</b></span><span>Moral <b>${moralTxt()}</b></span></div>
   ${warn.length?`<p class="warn tiny">⚠ ${warn.join(' · ')}</p>`:''}
@@ -3655,7 +3660,44 @@ Object.assign(ACT,{
   elresauto:()=>{S.lineup.res=elRes();save();render();toast('Reservas escolhidos automaticamente.')}
 });
 
+/* ======================================================================
+   EVOLUÇÃO POR RODADA (como no Elifoot): a força muda depois de cada jogo do time.
+   Subiu na rodada = número em azul; caiu = vermelho. Lesão tira 3 pontos de força.
+   ====================================================================== */
+function markEv(p,f0){const f1=FZ(p.o);if(f1!==f0)p.ev=f1>f0?1:-1}
+function devPlayer(p){
+  const mp=Math.max(1,S.teams[p.t]?S.teams[p.t].mp:1);const share=clamp(p.j/mp,0,1);const star=isStar(p);let d=0;const k=.25;
+  if(p.a<=25){if(p.o<p.pot&&R()<(.22+.42*share)*k){d=1;if(share>.35&&R()<.4)d=2}}
+  else if(p.a<=26){if(p.o<p.pot&&R()<(.1+.2*share)*k)d=1}
+  else if(star&&p.a<=32){if(p.o<Math.max(p.pot,p.o0+3)&&R()<(.06+.14*share)*k)d=1}
+  else if(star&&p.a<=34){if(share<.1&&R()<.03*k)d=-1}
+  else if(p.a<=29){if(p.o<p.pot&&R()<(.055+.11*share)*k)d=1;else if(R()<(.022+(share<.15?.045:0))*k)d=-1}
+  else if(p.a<=32){if(R()<.09*k)d=-1}
+  else{if(R()<.18*k)d=p.a>=35&&R()<.25?-2:-1}
+  if(p.inj>=6&&d>0)d=0;
+  return d;
+}
+function roundDev(teams){
+  const ups=[],downs=[];
+  teams.forEach(tid=>{(SQ.get(tid)||[]).forEach(p=>{
+    if(tid===S.me&&p.evd!==S.d){p.ev=0}
+    const d=devPlayer(p);if(!d)return;
+    const f0=FZ(p.o);p.o=clamp(p.o+d,38,95);if(p.o>p.pot)p.pot=p.o;p.evd=S.d;markEv(p,f0);
+    if(tid===S.me&&p.ev)(p.ev>0?ups:downs).push(`${p.n} ${p.ev>0?'▲':'▼'}`);
+  })});
+  if(ups.length||downs.length)news(`Evolução na rodada: ${ups.length?'subiram '+ups.join(', '):''}${ups.length&&downs.length?'; ':''}${downs.length?'caíram '+downs.join(', '):''}.`);
+}
+/* o relatório mensal agora só guarda o histórico do gráfico */
+function devTick(){S.players.forEach(p=>{if(p.t===S.me){p.h=p.h||[];p.h.push(p.o);if(p.h.length>12)p.h.shift()}})}
+function injure(m,t){
+  const on=m.on[t];if(!on.length)return;const p=P(pick(on)[1]);if(!p)return;
+  p.inj=ri(2,9);const f0=FZ(p.o);p.o=Math.max(38,p.o-3);p.evd=S.d;markEv(p,f0);if(t===S.me&&!p.ev)p.ev=-1;
+  m.ev.push({min:m.min,t,k:'les',n:p.n+' (−3)'});
+  const r=takeOff(m,t,p.id);
+  if(t===S.me&&MS&&MS.live&&m===MS.mine)m.gap[t].push(r);else autoSub(m,t,r);
+}
+
 </script>
-<script>const APPV="40";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="41";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
