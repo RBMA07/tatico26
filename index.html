@@ -1780,6 +1780,7 @@ function renderElenco(){
     <div class="presets"><p class="tiny mute" style="font-weight:700">MINHAS ESCALAÇÕES</p>
       <div class="roles">${(S.presets||[]).map((p,k)=>`<button class="chipb" data-a="lpre" data-v="${k}">${esc(p.n)}</button>`).join('')}<button class="chipb" data-a="lsave" style="border-style:dashed">＋ Salvar atual</button></div>
       ${(S.presets||[]).length?'':'<p class="tiny mute">Salve o time e o desenho atuais para usar de novo com um toque (ex.: titular, reservas, time para segurar resultado).</p>'}</div>
+    <div class="seg">${Object.entries(TAC).map(([k,v])=>`<button class="${S.lineup.tac===k?'on':''}" data-a="tac" data-v="${k}">${v.n}</button>`).join('')}</div>
     ${renderField()}
     ${n<11?`<p class="warn">Faltam ${11-n} jogadores. Arraste alguém do banco para as posições vazias.</p>`:''}
     ${myRoles().filter(r=>r==='GOL').length!==1?`<p class="warn">Deixe exatamente uma bolinha na área do goleiro.</p>`:''}
@@ -1788,7 +1789,6 @@ function renderElenco(){
     ${mf?'':`<p class="hint">Arraste uma bolinha até um dos locais marcados: ela encaixa ali e a função e o esquema se ajustam sozinhos. Solte em cima de outro jogador para trocar os dois de lugar. Toque para escolher quem joga ali.</p>`}
     <div class="roles">${Object.keys(FORMS).map(f=>`<button class="chipb ${formName()===f?'on':''}" data-a="form" data-v="${f}">${f}</button>`).join('')}</div>
     <div class="row"><button class="btn grow" data-a="auto">Escalar os melhores neste desenho</button></div>
-    <div class="seg">${Object.entries(TAC).map(([k,v])=>`<button class="${S.lineup.tac===k?'on':''}" data-a="tac" data-v="${k}">${v.n}</button>`).join('')}</div>
   </div>
   ${mf?`<p class="hint" style="text-align:center">Toque num jogador para trocar · arraste para mudar a posição. O elenco completo fica na aba Elenco.</p>`:`<div class="card"><div class="card-h"><h3>Elenco · ${sq.length}</h3><span class="tiny mute">Folha ${money(sq.reduce((s,p)=>s+wage(p),0))}/mês</span></div>
     <div class="list">${['G','D','M','A'].map(g=>{const gr=sq.filter(p=>GRP[p.p]===g).sort((a,b)=>ROLES.indexOf(a.p)-ROLES.indexOf(b.p)||b.o-a.o);return gr.length?`<div class="grp">${GRPL[g]}</div>`+gr.map(p=>playerRow(p)).join(''):''}).join('')}</div>
@@ -2498,6 +2498,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="16";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="17";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
