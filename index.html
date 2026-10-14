@@ -777,7 +777,7 @@ const GRPN={G:'Goleiro',D:'Defesa',M:'Médio',A:'Avançado'};
 const COMPN=['Fair Play','Cordeirinho','Cavalheiro','Caneleiro','Caceteiro','Sarrafeiro'];
 const CARDW=[.12,.4,.8,1.4,2.3,3.8];
 const compOf=p=>{const x=(p.id*7919+13)%100;return x<14?0:x<30?1:x<55?2:x<77?3:x<92?4:5};
-const isStar=p=>(GRP[p.p]==='M'||GRP[p.p]==='A')&&FZ(p.o)>=10&&((p.id*104729+7)%100)<28;
+const isStar=p=>p.star===1||((GRP[p.p]==='M'||GRP[p.p]==='A')&&FZ(p.o)>=10&&((p.id*104729+7)%100)<28);
 const LEGACY={G:'GOL',D:'ZAG',M:'MEI',A:'CA'};
 /* pontos perdidos ao jogar fora da função */
 const PAIR={'ZAG-LD':4,'ZAG-LE':4,'LD-LE':4,'ZAG-VOL':4,'VOL-MEI':2,'MEI-MOF':2,'VOL-MOF':5,'MOF-PD':4,'MOF-PE':4,'MOF-CA':4,'PD-PE':2,'PD-CA':4,'PE-CA':4,'LD-PD':5,'LE-PE':5,'LD-VOL':7,'LE-VOL':7,'MEI-PD':6,'MEI-PE':6};
@@ -879,6 +879,7 @@ function value(p){
   let v=Math.pow(1.17,e-55)*(e<64?Math.pow(1.12,e-64):1);
   if(p.a<=21)v*=1.35;else if(p.a<=24)v*=1.15;else if(p.a>=34)v*=.35;else if(p.a>=31)v*=.65;
   if(p.o<54)v*=.6;
+  if(isStar(p))v*=1.4;
   return Math.max(.01,v*VK);
 }
 /* salário MENSAL (R$ milhões) */
@@ -2118,7 +2119,7 @@ function nextSeason(P1){
 
 /* ==================== SALVAR (compactado) ==================== */
 const KEY='tatico26.v5',OLDKEY='tatico26.save';
-const PF=['id','n','p','p2','o','a','t','pot','w','ct','o0','g','j','inj','sus','sale','prom','gen','h','sgn','ev','evd','yc'];
+const PF=['id','n','p','p2','o','a','t','pot','w','ct','o0','g','j','inj','sus','sale','prom','gen','h','sgn','ev','evd','yc','star'];
 function packS(){
   const o={...S};o.players=S.players.map(p=>PF.map(k=>k==='w'?Math.round(p.w*1e4)/1e4:k==='sale'?(p.sale?1:0):k==='h'?(p.h||[]).join('.'):p[k]??0));
   return JSON.stringify(o);
@@ -3694,6 +3695,8 @@ function roundDev(teams){
     if(tid===S.me&&p.evd!==S.d){p.ev=0}
     const d=devPlayer(p);if(!d)return;
     const f0=FZ(p.o);p.o=clamp(p.o+d,38,95);if(p.o>p.pot)p.pot=p.o;p.evd=S.d;markEv(p,f0);
+    /* promessa que desabrocha vira craque (*) */
+    if(d>0&&p.prom&&!isStar(p)&&p.a<=25&&FZ(p.o)>=22&&R()<.1){p.star=1;if(tid===S.me)news(`✱ ${p.n} desabrochou e virou craque!`);}
     if(tid===S.me&&p.ev)(p.ev>0?ups:downs).push(`${p.n} ${p.ev>0?'▲':'▼'}`);
   })});
   if(ups.length||downs.length)news(`Evolução na rodada: ${ups.length?'subiram '+ups.join(', '):''}${ups.length&&downs.length?'; ':''}${downs.length?'caíram '+downs.join(', '):''}.`);
@@ -3716,6 +3719,6 @@ ACT.mev=()=>{MS.showEv=!MS.showEv;renderMatch()};
 Object.assign(ACT,{mstar:()=>{UI.mstar=!UI.mstar;render()},mprom:()=>{UI.mprom=!UI.mprom;render()}});
 
 </script>
-<script>const APPV="45";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="46";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
