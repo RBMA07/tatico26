@@ -851,8 +851,10 @@ function buildCalendar(year,C){
   const cbR=C.CB.stages[0].rounds;const fi=cbR.findIndex(r=>r.legs===2);const cb1=fi<0?cbR.length:fi,cb2=cbR.slice(cb1).reduce((s,r)=>s+r.legs,0);
   const contND=Math.max(C.LIB?compND(C.LIB):0,C.SUD?compND(C.SUD):0);
   const mb=mergeProp('C',contND,'Y',cb2);
-  const lanes=[];for(let i=0;i<16;i++)lanes.push('EA','MA');
-  mergeProp('L',38,'MB',mb.length).forEach(x=>lanes.push(x));
+  const lanes=[];
+  /* sem estaduais: o campeonato começa em janeiro, nos domingos que eram dos estaduais */
+  if(NOEST){for(let i=0;i<16;i++)lanes.push('L','MA');mergeProp('L',22,'MB',mb.length).forEach(x=>lanes.push(x))}
+  else{for(let i=0;i<16;i++)lanes.push('EA','MA');mergeProp('L',38,'MB',mb.length).forEach(x=>lanes.push(x))}
   let dt=new Date(Date.UTC(year,0,11));while(dt.getUTCDay()!==0)dt=new Date(+dt+864e5);
   const cal=lanes.map((ln,i)=>{const o={ln,y:dt.getUTCFullYear(),m:dt.getUTCMonth(),dd:dt.getUTCDate(),w:dt.getUTCDay()};dt=new Date(+dt+(o.w===0?3:4)*864e5);return o});
   const idx=ln=>cal.map((c,i)=>c.ln===ln?i:-1).filter(i=>i>=0);
@@ -1536,7 +1538,7 @@ function devTick(){
     const share=clamp(p.j/mp,0,1);let d=0;
     /* share = jogos em que entrou / jogos do time: entrar em campo conta igual, seja 1 minuto ou 90 */
     const star=isStar(p);
-    if(p.a<=23){if(p.o<p.pot&&R()<.22+.42*share){d=1;if(p.a<=21&&share>.35&&R()<.4)d=2}}
+    if(p.a<=25){if(p.o<p.pot&&R()<.22+.42*share){d=1;if(share>.35&&R()<.4)d=2}}
     else if(p.a<=26){if(p.o<p.pot&&R()<.1+.2*share)d=1}
     else if(star&&p.a<=32){if(p.o<Math.max(p.pot,p.o0+3)&&R()<.06+.14*share)d=1}
     else if(star&&p.a<=34){if(share<.1&&R()<.03)d=-1}
@@ -3477,6 +3479,6 @@ Object.assign(ACT,{
 Object.assign(ACT,{elpost:v=>{S.lineup.tac=v;save();render()}});
 
 </script>
-<script>const APPV="32";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="33";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
