@@ -372,6 +372,7 @@ label select{display:block;width:100%;margin-top:6px}
 .qs-h{display:flex;align-items:center;gap:10px}.qs-h>div{flex:1;display:flex;flex-direction:column}.qs-h small{color:#8ea4b8;font-size:12px}
 .qs .x{background:#0b1825;border:1px solid #1f3446;color:#8ea4b8;border-radius:50%;width:32px;height:32px}
 .qs em.rec{font-style:normal;font-size:11px;color:#35d07f;font-weight:700;margin-left:4px}
+.presets{display:flex;flex-direction:column;gap:6px}
 
 </style>
 
@@ -1748,6 +1749,9 @@ function renderElenco(){
     ${mf?'':`<p class="hint">Arraste uma bolinha até um dos locais marcados: ela encaixa ali e a função e o esquema se ajustam sozinhos. Solte em cima de outro jogador para trocar os dois de lugar. Toque para escolher quem joga ali.</p>`}
     <div class="roles">${Object.keys(FORMS).map(f=>`<button class="chipb ${formName()===f?'on':''}" data-a="form" data-v="${f}">${f}</button>`).join('')}</div>
     <div class="row"><button class="btn grow" data-a="auto">Escalar os melhores neste desenho</button></div>
+    <div class="presets"><p class="tiny mute" style="font-weight:700">MINHAS ESCALAÇÕES</p>
+      <div class="roles">${(S.presets||[]).map((p,k)=>`<button class="chipb" data-a="lpre" data-v="${k}">${esc(p.n)}</button>`).join('')}<button class="chipb" data-a="lsave" style="border-style:dashed">＋ Salvar atual</button></div>
+      ${(S.presets||[]).length?'':'<p class="tiny mute">Salve o time e o desenho atuais para usar de novo com um toque (ex.: titular, reservas, time para segurar resultado).</p>'}</div>
     <div class="seg">${Object.entries(TAC).map(([k,v])=>`<button class="${S.lineup.tac===k?'on':''}" data-a="tac" data-v="${k}">${v.n}</button>`).join('')}</div>
   </div>
   ${mf?`<p class="hint" style="text-align:center">Toque num jogador para trocar · arraste para mudar a posição. O elenco completo fica na aba Elenco.</p>`:`<div class="card"><div class="card-h"><h3>Elenco · ${sq.length}</h3><span class="tiny mute">Folha ${money(sq.reduce((s,p)=>s+wage(p),0))}/mês</span></div>
@@ -2171,6 +2175,7 @@ function renderMatch(){
 
 
 /* ==================== EVENTOS ==================== */
+function snapLineup(n){return{n,f:formName(),tac:S.lineup.tac,pos:S.lineup.pos.map(q=>({x:q.x,y:q.y})),xi:S.lineup.xi.slice()}}
 function toast(s){const t=$('#toast');t.textContent=s;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600)}
 async function copyText(txt,okMsg){try{await navigator.clipboard.writeText(txt);toast(okMsg)}catch(e){toast('Não deu para copiar automaticamente. Selecione o texto e copie.')}}
 function exportCSV(){return 'CLUBE;FUNÇÃO;NOME;FORÇA;IDADE;FUNÇÃO2\n'+squad(S.me).sort((a,b)=>ROLES.indexOf(a.p)-ROLES.indexOf(b.p)||b.o-a.o).map(p=>`${T(S.me).name};${p.p};${p.n};${p.o};${p.a};${p.p2||''}`).join('\n')}
@@ -2232,6 +2237,17 @@ const ACT={
     fixMyXI();UI.pre=true;UI.tab='elenco';render();$('#main').scrollTop=0;
   },
   allb:()=>{UI.allb=true;render()},
+  lsave:()=>{const L=S.presets||[];openSheet('Salvar escalação',`<p class="small">Guarda o desenho (${esc(formName())}), a posição de cada bolinha, os 11 jogadores e a postura (${TAC[S.lineup.tac].n.toLowerCase()}).</p>
+    <label for="lpn">Nome<input type="text" id="lpn" maxlength="24" value="${esc(L.length?formName()+' '+(L.length+1):'Titular')}"></label>
+    <button class="btn pri" data-a="lsavego">Salvar</button>
+    ${L.length?`<p class="tiny mute" style="font-weight:700;margin-top:6px">SALVAS (${L.length}/8) · toque no nome para substituir pela atual</p>${L.map((p,k)=>`<div class="row"><button class="btn sm grow" data-a="lover" data-v="${k}" style="justify-content:flex-start">${esc(p.n)} <span class="tiny mute">· ${esc(p.f)}</span></button><button class="btn sm danger" data-a="ldel" data-v="${k}" aria-label="Apagar">✕</button></div>`).join('')}`:''}`)},
+  lsavego:()=>{const n=($('#lpn').value||'').trim()||formName();S.presets=S.presets||[];if(S.presets.length>=8)return toast('Máximo de 8 escalações. Apague ou substitua uma.');
+    S.presets.push(snapLineup(n));save();closeSheet();render();toast(`Escalação “${n}” salva.`)},
+  lover:v=>{const p=S.presets[+v];S.presets[+v]=snapLineup(p.n);save();closeSheet();render();toast(`“${p.n}” atualizada com o time atual.`)},
+  ldel:v=>{const p=S.presets.splice(+v,1)[0];save();ACT.lsave();toast(`“${p.n}” apagada.`)},
+  lpre:v=>{const p=S.presets[+v];if(!p)return;S.lineup.pos=p.pos.map(q=>({...q}));S.lineup.tac=p.tac;S.lineup.form=p.f;
+    const miss=[];S.lineup.xi=p.xi.map(id=>{const pl=P(id);if(!pl||pl.t!==S.me||!avail(pl)){if(pl)miss.push(pl.n);return null}return id});
+    fixMyXI();save();render();toast(miss.length?`“${p.n}” aplicada. Fora: ${miss.join(', ')} (substituídos pelos melhores disponíveis).`:`Escalação “${p.n}” aplicada.`)},
   mallb:()=>{MS.allb=true;renderMatch()},
   qsin:v=>{const m=MS.mine;const o=MS.qs&&MS.qs.out;MS.qs=null;if(!o)return;if(m.subs[S.me]>=5){toast('Limite de 5 trocas atingido.');renderMatch();return}
     if(!m.on[S.me].some(x=>x[1]===o)){renderMatch();return}
@@ -2422,6 +2438,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="10";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="11";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
