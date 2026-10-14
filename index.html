@@ -357,6 +357,13 @@ label select{display:block;width:100%;margin-top:6px}
 .mspot span{font-size:8px;font-weight:700;letter-spacing:.02em}
 #match .chipb.mchip{background:#0b1825;color:#e8f0f7;border-color:#3a5670}
 #match .seg{margin-top:8px}
+.mslot.pout i{opacity:.45}
+.mslot.pout span{color:#35d07f}
+.pendl{display:flex;flex-direction:column;gap:6px}
+.pendl>div{display:flex;align-items:center;gap:8px;background:#0b1825;border:1px solid #1f3446;border-radius:10px;padding:6px 10px;font-size:13px}
+.pendl>div span{flex:1;min-width:0}
+.pendl .x{background:none;border:0;color:#8ea4b8;font-size:16px;padding:2px 6px}
+#match .chipb.mchip.on{background:#35d07f;color:#07121c;border-color:#35d07f}
 
 </style>
 
@@ -2047,6 +2054,22 @@ function openPlayer(pid){
 }
 
 /* ==================== PARTIDA ==================== */
+/* esquemas para quantos estiverem em campo (expulsões): defensores-meias-atacantes */
+function formsFor(n){
+  if(n>=11)return Object.keys(FORMS);
+  const o=n-1,out=[];
+  for(const d of [4,5,3,2])for(const a of [1,2,0,3]){const mm=o-d-a;if(mm>=1&&mm<=5&&a<=o-3&&!out.includes(`${d}-${mm}-${a}`))out.push(`${d}-${mm}-${a}`)}
+  return out.slice(0,7);
+}
+function formSlots(v){
+  if(FORMS[v])return FORMS[v].map(([r,x,y])=>({r,x,y}));
+  const [d,mm,a]=v.split('-').map(Number);const S_=[{r:'GOL',x:50,y:90}];
+  const DL={1:[['ZAG',50]],2:[['ZAG',31],['ZAG',69]],3:[['ZAG',31],['ZAG',50],['ZAG',69]],4:[['LE',12],['ZAG',31],['ZAG',69],['LD',88]],5:[['LE',12],['ZAG',31],['ZAG',50],['ZAG',69],['LD',88]]};
+  const ML={1:[['VOL',50,57]],2:[['VOL',31,57],['VOL',69,57]],3:[['VOL',50,57],['MEI',31,44],['MEI',69,44]],4:[['PE',12,44],['VOL',31,57],['VOL',69,57],['PD',88,44]],5:[['PE',12,44],['VOL',31,57],['MOF',50,31],['VOL',69,57],['PD',88,44]]};
+  const AL={0:[],1:[['CA',50,14]],2:[['CA',31,14],['CA',69,14]],3:[['PE',12,14],['CA',50,14],['PD',88,14]]};
+  (DL[d]||[]).forEach(([r,x])=>S_.push({r,x,y:74}));(ML[mm]||[]).forEach(([r,x,y])=>S_.push({r,x,y}));(AL[a]||[]).forEach(([r,x,y])=>S_.push({r,x,y}));
+  return S_;
+}
 const ICON={gol:'⚽',pg:'⚽',pp:'❌',pen:'🎯',am:'🟨',vm:'🟥',les:'🚑',sub:'🔁'};
 function groupAfter(c,ms){
   const st=c.st;if(!st||st.t!=='rr')return null;const g=st.groups.find(g=>g.tb[S.me]);if(!g)return null;
@@ -2066,19 +2089,23 @@ function renderMatch(){
   if(MS.paused&&!MS.done){
     const on=m.on[me].slice().sort((a,b)=>ROLES.indexOf(a[0])-ROLES.indexOf(b[0]));
     const selRole=MS.selOut?(on.find(x=>x[1]===MS.selOut)||[])[0]:m.gap[me][0];
-    const b=bench(m,me).sort((x,y)=>selRole?((penP(y,selRole)<=1)-(penP(x,selRole)<=1))||eff(y,selRole)-eff(x,selRole):y.o-x.o);
+    const pend=MS.pend||[];const pOut=new Set(pend.map(x=>x.o)),pIn=new Set(pend.map(x=>x.i));
+    const b=bench(m,me).filter(p=>!pIn.has(p.id)).sort((x,y)=>selRole?((penP(y,selRole)<=1)-(penP(x,selRole)<=1))||eff(y,selRole)-eff(x,selRole):y.o-x.o);
     const tm=T(me);const bg=bgOf(tm),fg=fgOn(bg);const RXY={GOL:[50,90],ZAG:[50,74],LD:[88,74],LE:[12,74],VOL:[50,57],MEI:[50,44],MOF:[50,31],PD:[88,31],PE:[12,31],CA:[50,14]};
-    const fld=`<div class="field mf">${'<div class="mid"></div><div class="ccl"></div><div class="box t"></div><div class="box b"></div>'}${m.on[me].map(([r,id])=>{const p=P(id);const q=m.posMe[id]||{x:RXY[r][0],y:RXY[r][1]};const pn=penP(p,r);return `<button class="slot mslot ${pn>1?'off':''} ${MS.selOut===id?'sel':''}" style="left:${q.x}%;top:${q.y}%" data-a="sout" data-v="${id}" aria-label="${r}: ${esc(p.n)}"><i style="background:${bg};color:${fg}">${p.o}${pn>1?`<em>−${pn}</em>`:''}</i><b>${r}</b><span>${esc(p.n.split(' ').slice(-1)[0])}</span></button>`}).join('')}${m.gapPos.map(q=>`<div class="slot empty" style="left:${q.x}%;top:${q.y}%"><i>+</i><b>VAGA</b><span>lesão</span></div>`).join('')}${MS.selOut&&!MS.selIn?SPOTS.filter(s=>!m.on[me].some(([r,id])=>{const q=m.posMe[id]||{x:RXY[r][0],y:RXY[r][1]};return q.x===s.x&&q.y===s.y})).map(s=>`<button class="mspot" style="left:${s.x}%;top:${s.y}%" data-a="mspot" data-v="${s.x},${s.y}" aria-label="Mover para ${zoneRole(s.x,s.y)}"><span>${zoneRole(s.x,s.y)}</span></button>`).join(''):''}</div>`;
+    const fld=`<div class="field mf">${'<div class="mid"></div><div class="ccl"></div><div class="box t"></div><div class="box b"></div>'}${m.on[me].map(([r,id])=>{const p=P(id);const q=m.posMe[id]||{x:RXY[r][0],y:RXY[r][1]};const pn=penP(p,r);const po=pend.find(x=>x.o===id);return `<button class="slot mslot ${pn>1?'off':''} ${MS.selOut===id?'sel':''} ${po?'pout':''}" style="left:${q.x}%;top:${q.y}%" data-a="sout" data-v="${id}" aria-label="${r}: ${esc(p.n)}"><i style="background:${bg};color:${fg}">${p.o}${pn>1?`<em>−${pn}</em>`:''}</i><b>${r}</b><span>${po?'↔ '+esc(P(po.i).n.split(' ').slice(-1)[0]):esc(p.n.split(' ').slice(-1)[0])}</span></button>`}).join('')}${m.gapPos.map(q=>`<div class="slot empty" style="left:${q.x}%;top:${q.y}%"><i>+</i><b>VAGA</b><span>lesão</span></div>`).join('')}${MS.selOut&&!MS.selIn?SPOTS.filter(s=>!m.on[me].some(([r,id])=>{const q=m.posMe[id]||{x:RXY[r][0],y:RXY[r][1]};return q.x===s.x&&q.y===s.y})).map(s=>`<button class="mspot" style="left:${s.x}%;top:${s.y}%" data-a="mspot" data-v="${s.x},${s.y}" aria-label="Mover para ${zoneRole(s.x,s.y)}"><span>${zoneRole(s.x,s.y)}</span></button>`).join(''):''}</div>`;
     const itB=p=>`<button class="bb mb ${MS.selIn===p.id?'sel':''}" data-a="sin" data-v="${p.id}" aria-label="${esc(p.n)}"><i style="background:${bg};color:${fg}">${selRole?eff(p,selRole):p.o}</i><b>${p.p}</b><span>${esc(p.n.split(' ').slice(-1)[0])}</span></button>`;
     panel=`<div class="mcard"><h3>Ajustes · trocas ${m.subs[me]}/5</h3>
       <div class="seg">${Object.entries(TAC).map(([k,v])=>`<button class="${m.tac[me]===k?'on':''}" data-a="mtac" data-v="${k}">${v.n}</button>`).join('')}</div>
       <p class="tiny" style="color:var(--m-mute);font-weight:700">ESQUEMA</p>
-      <div class="roles">${Object.keys(FORMS).map(f=>`<button class="chipb mchip" data-a="mform" data-v="${f}">${f}</button>`).join('')}</div>
-      <p class="tiny" style="color:var(--m-mute)">Mudar posição: toque no jogador e depois num círculo vazio do campo (a função muda conforme a zona). Trocar: toque em quem sai, depois em quem entra no banco${selRole?` (força como ${selRole})`:''} e confirme.</p>
+      <div class="roles">${formsFor(m.on[me].length).map(f=>`<button class="chipb mchip ${MS.form===f?'on':''}" data-a="mform" data-v="${f}">${f}</button>`).join('')}</div>
+      ${m.on[me].length<11?`<p class="tiny" style="color:#ff8a80">${m.on[me].length} em campo: escolha como o time se arruma (defensores-meias-atacantes).</p>`:''}
+      <p class="tiny" style="color:var(--m-mute)">Mudar posição: toque no jogador e depois num círculo vazio do campo (a função muda conforme a zona). Trocar: toque em quem sai e em quem entra${selRole?` (força como ${selRole})`:''}; repita para montar várias trocas e confirme tudo de uma vez.</p>
       ${fld}
       <p class="tiny" style="color:var(--m-mute);font-weight:700">BANCO</p>
       <div class="benchrow">${b.map(itB).join('')||'<span class="tiny" style="color:var(--m-mute)">Banco vazio</span>'}</div>
-      <button class="btn pri" data-a="dosub" ${MS.selIn&&m.subs[me]<5&&(MS.selOut||m.gap[me].length)?'':'disabled'}>Confirmar troca</button>
+      ${pend.length?`<div class="pendl">${pend.map((x,k)=>`<div><span>${x.o?`<b class="dn">↓</b> ${esc(P(x.o).n)}`:'<b class="dn">↓</b> vaga (lesão)'} <b class="up">↑</b> ${esc(P(x.i).n)}</span><button class="x" data-a="unpend" data-v="${k}" aria-label="Desfazer">✕</button></div>`).join('')}</div>`:''}
+      ${MS.selIn&&!MS.selOut&&!freeGaps()?`<p class="tiny" style="color:var(--m-goal)">Agora toque em quem sai no campo.</p>`:''}
+      <button class="btn pri" data-a="dosub" ${pend.length?'':'disabled'}>Confirmar ${pend.length>1?pend.length+' trocas':'troca'}</button>
       ${m.down[me]?`<p class="tiny" style="color:#ff8a80">Expulsão: o time segue com ${11-m.down[me]} até o fim. Jogador expulso não pode ser substituído.</p>`:''}
       ${m.gap[me].length?`<p class="tiny" style="color:var(--m-goal)">Posição vaga por lesão: ${m.gap[me].join(', ')}. Escolha quem entra sem tirar ninguém.</p>`:''}
     </div>`;
@@ -2149,6 +2176,19 @@ function importCSV(txt){
 }
 function saveCode(){const raw=packS();const z=LZ();return z?'TZ:'+z.compressToBase64(raw):raw}
 function readCode(txt){txt=txt.trim();if(txt.startsWith('TZ:')){const z=LZ();if(!z)throw new Error('lz');txt=z.decompressFromBase64(txt.slice(3))}return unpackS(txt)}
+/* trocas em lote: monte a lista (sai → entra) e confirme tudo de uma vez */
+function freeGaps(){const m=MS.mine;return m.gap[S.me].length-(MS.pend||[]).filter(x=>!x.o).length}
+function tryPair(){
+  const m=MS.mine;MS.pend=MS.pend||[];if(!MS.selIn)return;
+  if(m.subs[S.me]+MS.pend.length>=5){toast('Limite de 5 trocas atingido.');MS.selIn=null;return}
+  if(MS.selOut){MS.pend.push({o:MS.selOut,i:MS.selIn});MS.selOut=MS.selIn=null;toast('Troca adicionada à lista.')}
+  else if(freeGaps()>0){MS.pend.push({o:null,i:MS.selIn});MS.selIn=null;toast('Entrada adicionada à lista.')}
+}
+function applyPend(){
+  const m=MS.mine;const L=MS.pend||[];let n=0;
+  L.forEach(x=>{if(m.subs[S.me]>=5)return;if(x.o){if(m.on[S.me].some(o=>o[1]===x.o)){doSub(m,S.me,x.o,x.i);n++}}else if(m.gap[S.me].length){doSub(m,S.me,null,x.i,m.gap[S.me].shift());n++}});
+  MS.pend=[];MS.selIn=MS.selOut=null;if(n)toast(`${n} troca(s) feita(s).`);
+}
 const ACT={
   tab:v=>{UI.tab=v;UI.confirm=null;render();$('#main').scrollTop=0},
   pick:v=>{toast('Montando o mundo do futebol…');setTimeout(()=>{newGame(v,($('#coach')?.value||'').trim());UI.tab='clube';UI.tc=null;render()},30)},
@@ -2212,7 +2252,7 @@ const ACT={
   crestdel:v=>{delete CRESTS[v];saveCrests();render()},
   newgame:()=>{if(UI.confirm!=='new'){UI.confirm='new';render();return}try{localStorage.removeItem(KEY)}catch(e){}S=null;UI.confirm=null;closeSheet();render();toast('Jogo salvo apagado.')},
   mpause:()=>{MS.paused=true;clearInterval(MS.timer);renderMatch()},
-  mresume:()=>{const m=MS.mine;m.gap[S.me].splice(0).forEach(r=>autoSub(m,S.me,r));MS.paused=false;MS.selIn=MS.selOut=null;runClock();renderMatch()},
+  mresume:()=>{const m=MS.mine;applyPend();m.gap[S.me].splice(0).forEach(r=>autoSub(m,S.me,r));MS.paused=false;MS.selIn=MS.selOut=null;runClock();renderMatch()},
   mspeed:()=>{MS.speed=MS.speed===1?2:MS.speed===2?4:1;runClock();renderMatch()},
   pentk:v=>{const m=MS.mine;const ok=resolvePen(m,S.me,+v);MS.pen=null;toast(ok?'GOL! Pênalti convertido.':'Perdeu o pênalti!');MS.paused=false;runClock();renderMatch()},
   mskip:()=>skipToEnd(),
@@ -2220,19 +2260,16 @@ const ACT={
     if(r==='GOL'&&m.on[me].some(o=>o[0]==='GOL'&&o!==e))return toast('Já há um goleiro em campo.');
     m.posMe[e[1]]={x,y};e[0]=r;m.dirty=true;MS.selOut=null;toast(`${P(e[1]).n} agora joga como ${RN[r].toLowerCase()}.`);renderMatch()},
   mform:v=>{const m=MS.mine,me=S.me;const on=m.on[me];if(!on.length)return;
-    let slots=FORMS[v].map(([r,x,y])=>({r,x,y}));
-    /* com expulsão/lesão sem troca, o esquema perde primeiro um jogador de frente */
-    const DROP=['PE','PD','MOF','CA','MEI','VOL','LD','LE','ZAG'];
-    while(slots.length>on.length){const r=DROP.find(r=>slots.some(s=>s.r===r));const k=slots.map(s=>s.r).lastIndexOf(r);slots.splice(k,1)}const pool=on.map(o=>P(o[1]));const used=new Set();const out=[];
+    const slots=formSlots(v);if(slots.length!==on.length)return toast('Esse esquema não serve para quantos estão em campo.');
+    const pool=on.map(o=>P(o[1]));const used=new Set();const out=[];
     const pickFor=(s,nat)=>{const c=pool.filter(p=>!used.has(p.id)&&(!nat||penP(p,s.r)<=1)&&(s.r!=='GOL'||p.p==='GOL'||!pool.some(q=>q.p==='GOL'&&!used.has(q.id)))).sort((a,b)=>eff(b,s.r)-eff(a,s.r))[0];if(c){used.add(c.id);out.push([s,c])}};
     const rest=[];slots.forEach(s=>{const n=out.length;pickFor(s,true);if(out.length===n)rest.push(s)});rest.forEach(s=>pickFor(s,false));
-    out.forEach(([s,p])=>{const e=on.find(o=>o[1]===p.id);e[0]=s.r;m.posMe[p.id]={x:s.x,y:s.y}});m.dirty=true;MS.selOut=MS.selIn=null;toast(on.length<11?`Time reorganizado no ${v}, com ${on.length} em campo.`:`Time reorganizado no ${v}.`);renderMatch()},
+    out.forEach(([s,p])=>{const e=on.find(o=>o[1]===p.id);e[0]=s.r;m.posMe[p.id]={x:s.x,y:s.y}});m.dirty=true;MS.selOut=MS.selIn=null;MS.form=v;toast(`Time reorganizado no ${v}${on.length<11?`, com ${on.length} em campo`:''}.`);renderMatch()},
   mtac:v=>{MS.mine.tac[S.me]=v;MS.mine.dirty=true;S.lineup.tac=v;renderMatch()},
-  sout:v=>{MS.selOut=MS.selOut===+v?null:+v;renderMatch()},
-  sin:v=>{MS.selIn=MS.selIn===+v?null:+v;renderMatch()},
-  dosub:()=>{const m=MS.mine;if(m.subs[S.me]>=5||!MS.selIn)return;
-    if(MS.selOut)doSub(m,S.me,MS.selOut,MS.selIn);else if(m.gap[S.me].length)doSub(m,S.me,null,MS.selIn,m.gap[S.me].shift());else return;
-    MS.selIn=MS.selOut=null;renderMatch()},
+  sout:v=>{v=+v;const pd=(MS.pend||[]).find(x=>x.o===v);if(pd)return toast('Esse jogador já está na lista para sair. Toque no ✕ da lista para desfazer.');MS.selOut=MS.selOut===v?null:v;tryPair();renderMatch()},
+  sin:v=>{v=+v;MS.selIn=MS.selIn===v?null:v;tryPair();renderMatch()},
+  unpend:v=>{MS.pend=(MS.pend||[]).filter((x,k)=>k!==+v);renderMatch()},
+  dosub:()=>{applyPend();renderMatch()},
   mclose:()=>closeMatch()
 };
 document.addEventListener('click',e=>{
