@@ -1053,7 +1053,7 @@ function tick(){
 function skipToEnd(){const m=MS.mine;if(MS.pen){const id=bestTaker(m,S.me);if(id)resolvePen(m,S.me,id);MS.pen=null}MS.paused=false;MS.live=false;clearInterval(MS.timer);(m.gap[S.me]||[]).splice(0).forEach(r=>autoSub(m,S.me,r));while(m.min<m.end)stepMatch(m);finishLive()}
 function finishLive(){clearInterval(MS.timer);MS.done=true;MS.live=false;koDecider(MS.mine,MS.c);renderMatch()}
 function closeMatch(){
-  const {all}=MS;MS=null;$('#match').hidden=true;
+  const {all}=MS;MS=null;$('#match').hidden=true;$('#match').innerHTML='';
   postDate(all);
   save();render();
 }
@@ -2087,6 +2087,7 @@ function renderMatch(){
     else if(m.agg||m.pens){const w=m.pens?(m.pens[0]>m.pens[1]?m.h:m.a):(m.agg[0]>m.agg[1]?m.h:m.a);
       endCard=`<div class="mcard"><h3>${esc(label)}</h3><p class="small">${m.agg&&st.rounds[st.r].legs>1?`Agregado: ${esc(T(m.h).name)} ${m.agg[0]} x ${m.agg[1]} ${esc(T(m.a).name)}. `:''}${m.pens?`Pênaltis: ${m.pens[0]} x ${m.pens[1]}. `:''}<b>${w===me?'Classificado!':'Eliminado.'}</b> ${esc(T(w).name)} avança${st.r===st.rounds.length-1?' e é campeão':''}.</p></div>`}
   }
+  const _ow=$('#match .wrap'),_st=_ow?_ow.scrollTop:0;
   $('#match').innerHTML=`<div class="wrap">
     <div class="board">
       <div class="st">${esc(label.toUpperCase())}</div><div class="st">${status}</div><div class="st" style="letter-spacing:.04em">Público: ${(m.pub||0).toLocaleString('pt-BR')} (${Math.round((m.occ||0)*100)}%)</div>
@@ -2101,6 +2102,7 @@ function renderMatch(){
     <div class="mcard"><h3>Lances</h3><div class="tl">${evs.length?evs.map(e=>`<div><span class="mn">${e.min}'</span><span>${ICON[e.k]}</span><span class="${e.k==='gol'||e.k==='pg'?'g':''}">${esc(e.n)} <span class="side">${esc(T(e.t).code)}</span></span></div>`).join(''):`<div><span></span><span></span><span style="color:var(--m-mute)">A bola vai rolar…</span></div>`}</div></div>
     ${others?`<div class="mcard"><h3>Outros jogos · ${esc(c.s)}</h3><div class="og">${others}</div></div>`:''}
   </div>`;
+  {const _nw=$('#match .wrap');if(_nw&&_st)_nw.scrollTop=_st}
 }
 
 
