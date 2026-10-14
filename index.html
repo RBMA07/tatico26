@@ -2660,11 +2660,6 @@ function renderJogo(){
     <button class="btn" data-a="quick" ${n<11?'disabled':''} style="background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35)">Simular sem assistir</button>
   </div></section>
   ${n<11?`<p class="warn">Faltam ${11-n} titulares. Complete a escalação na aba Elenco.</p>`:''}
-  <div class="card"><h3>Chances</h3>
-    <div class="odds"><div><b>${Math.round(mine[0]*100)}%</b><small>Vitória</small></div><div><b>${Math.round(mine[1]*100)}%</b><small>Empate</small></div><div><b>${Math.round(mine[2]*100)}%</b><small>Derrota</small></div></div>
-    ${bar('Ataque',o.sh.att,o.sa.att)}${bar('Defesa',o.sh.def,o.sa.def)}${bar('Gols esperados',o.lh,o.la)}
-    <div class="kv small"><span>Fator casa (${Math.round(o.occ*100)}% do estádio)</span><b class="up">+${Math.round((homeAdv(o.occ)/awayAdv(o.occ)-1)*100)}% para o ${esc(T(nf.h).name)}</b></div>
-    <p class="hint">Estádio cheio empurra o mandante. Decisões e jogos de Libertadores enchem mais; estadual no começo do ano, menos. ${nf.home?'Quando o time vai mal, baixar o ingresso (aba Gestão) faz muito mais diferença.':''}</p></div>
   <div class="card"><div class="card-h"><h3>Seu time</h3><span class="pill">${formName()} · média ${fAvg(xiAvg())}</span></div>
     <div class="seg">${Object.entries(TAC).map(([k,v])=>`<button class="${S.lineup.tac===k?'on':''}" data-a="tac" data-v="${k}">${v.n}</button>`).join('')}</div>
     ${myOut.length?`<p class="warn">Desfalques no time titular: ${myOut.map(p=>esc(p.n)).join(', ')}. Eles serão trocados automaticamente.</p>`:''}
@@ -3569,8 +3564,8 @@ function renderMatch(){
   }
   if(MS.pen&&!MS.done){
     const list=m.on[me].filter(x=>P(x[1])).map(([r,id])=>({r,p:P(id),c:penChance(m,me,P(id),r)})).sort((a,b)=>b.c-a.c);
-    panel=`<div class="sw pen"><div class="sw-h"><b>🎯 Pênalti para o ${esc(T(me).name)} · ${m.min}'</b><span>Escolha o batedor (* = craque)</span></div>
-      ${list.map(x=>`<button class="sw-p" data-a="pentk" data-v="${x.p.id}">${rpill(x.r)}<span>${esc(x.p.n)}${isStar(x.p)?'*':''}</span><b>${Math.round(x.c*100)}%</b></button>`).join('')}</div>`;
+    panel=`<div class="sw pen"><div class="sw-h"><b>🎯 Pênalti para o ${esc(T(me).name)} · ${m.min}'</b><span>Escolha o batedor (* = craque bate melhor)</span></div>
+      ${list.map(x=>`<button class="sw-p" data-a="pentk" data-v="${x.p.id}">${rpill(x.r)}<span>${esc(x.p.n)}${isStar(x.p)?'*':''}</span><b>${FZ(x.p.o)}</b></button>`).join('')}</div>`;
   }
   let endCard='';
   if(MS.done){
@@ -3662,6 +3657,6 @@ Object.assign(ACT,{
 });
 
 </script>
-<script>const APPV="38";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="39";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
