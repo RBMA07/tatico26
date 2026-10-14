@@ -494,6 +494,24 @@ tr.tlink:active td{background:var(--accent-soft)}
 .gcard{border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
 .gtot{display:flex;align-items:baseline;gap:8px}.gtot span{font-size:1.2rem}.gtot b{font-size:1.8rem;line-height:1}.gtot small{color:var(--mute)}
 .gcomp{display:flex;flex-wrap:wrap;gap:6px}.gcomp span{font-size:.78rem;background:var(--surface2);border-radius:999px;padding:3px 9px}
+/* leilão ao vivo */
+#auclive .al-wrap{position:fixed;inset:0;z-index:75;background:rgba(4,10,16,.82);display:flex;align-items:center;justify-content:center;padding:16px;animation:paIn .25s ease}
+.al{width:min(380px,100%);max-height:100%;overflow:auto;background:var(--surface);color:var(--ink,inherit);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 16px 50px rgba(0,0,0,.5)}
+.al-top{display:flex;justify-content:space-between;font-size:.75rem;font-weight:800;letter-spacing:.08em;color:var(--mute)}
+.al-pl{display:flex;gap:12px;align-items:center}.al-pl .ovr{font-size:1.6rem;min-width:54px;height:54px;display:grid;place-items:center}
+.al-nm{font-size:1.2rem}.al-pl p{margin:2px 0 0}
+.al-bid{text-align:center;border:2px solid var(--line);border-radius:16px;padding:10px;transition:background .3s,border-color .3s}
+.al-bid small{font-size:.7rem;font-weight:800;letter-spacing:.1em;color:var(--mute)}
+.al-bid>b{display:block;font-size:2.1rem;line-height:1.15;font-variant-numeric:tabular-nums}
+.al-bid.flash{border-color:#ffb020;background:color-mix(in srgb,#ffb020 14%,transparent);animation:paPop .35s ease}
+.al-lead{display:flex;align-items:center;justify-content:center;gap:6px;font-size:.9rem}
+.al-me{color:var(--win)}
+.al-bar{height:8px;border-radius:99px;background:var(--surface2);overflow:hidden}.al-bar i{display:block;height:100%;background:linear-gradient(90deg,#e8452c,#ffb020,#2fbf71);transition:width .25s linear}
+.al-msg{margin:0;text-align:center;font-weight:900;font-size:1.25rem;min-height:1.5em}
+.al-msg.up{color:var(--win)}.al-msg.dn{color:var(--mute)}
+.arank{width:26px;text-align:center;font-weight:800;color:var(--mute);flex:none}
+.agoals{font-size:1.2rem;font-weight:900;min-width:34px;text-align:right}
+.pr.me .nm{color:var(--accent)}
 
 </style>
 
@@ -1658,13 +1676,12 @@ function openAucSession(){
   while(pick.length<8&&src.length)pick.push(src.splice(ri(0,src.length-1),1)[0]);
   const lots=pick.map(p=>{
     const v=Math.max(.05,value(p));const start=Math.max(.05,Math.round(v*.5*20)/20);
-    const rivs=buyersFor(p,start);const riv=rivs.length&&R()<.75?rivs[ri(0,rivs.length-1)].id:null;
-    const max=riv?Math.min(T(riv).cash,v*(.7+R()*.65)):0;
-    const lead=riv&&max>=start&&R()<.5?riv:null;
-    return {pid:p.id,start,cur:start,lead,riv,max,from:p.t};
+    const cand=buyersFor(p,start).filter(t=>t.id!==p.t);const rivs=[];
+    for(let k=0;k<2&&cand.length;k++){if(R()<(k?.45:.8)){const t=cand.splice(ri(0,cand.length-1),1)[0];rivs.push({id:t.id,max:Math.min(t.cash,v*(.7+R()*.65))})}}
+    return {pid:p.id,start,cur:start,lead:null,rivs,from:p.t};
   });
-  S.aucS={lots,d:S.d};
-  news(`Sessão de leilão aberta: ${lots.length} jogadores à venda. Dê seus lances antes do próximo jogo.`);
+  S.aucS={lots,d:S.d,i:0};
+  news(`Sessão de leilão aberta: ${lots.length} jogadores à venda.`);
   if(S.auctions.length&&!inWindow())auctionTick();
 }
 function aucBid(i){
@@ -1681,14 +1698,64 @@ function aucBid(i){
   save();openAucSheet();
 }
 function closeAucSession(){
-  const s=S.aucS;if(!s)return;S.aucS=null;const got=[];
-  s.lots.forEach(L=>{const p=P(L.pid);if(!p||p.t!==L.from||!L.lead)return;
+  const s=S.aucS;if(!s)return;S.aucS=null;clearInterval(AUCT);const el=document.getElementById('auclive');if(el)el.remove();const got=[];
+  s.lots.forEach(L=>{const p=P(L.pid);if(L.done||!p||p.t!==L.from||!L.lead)return;
     if(L.lead==='me'){if(T(S.me).cash<L.cur||sqLen(S.me)>=34)return;transfer(p,S.me,L.cur);p.w=baseWage(p)*1.1;p.ct=p.a<=21?3:2;p.sgn=S.season;got.push(`${p.n} (${money(L.cur)})`)}
     else if(T(L.lead).cash>=L.cur&&sqLen(L.lead)<32)transfer(p,L.lead,L.cur);
   });
   fixMyXI();
   news(got.length?`Leilão encerrado. Arrematados: ${got.join(', ')}.`:'Sessão de leilão encerrada sem compras suas.');
 }
+
+/* ==================== LEILÃO AO VIVO (um jogador por vez, estilo Elifoot) ==================== */
+let AUCT=null;
+const AUC_T0=8,AUC_RESET=4;
+function aucRivs(L){if(!L.rivs)L.rivs=L.riv?[{id:L.riv,max:L.max||0}]:[];return L.rivs}
+function openAucLive(){
+  const s=S.aucS;if(!s)return;if(s.i==null)s.i=0;
+  while(s.i<s.lots.length&&s.lots[s.i].done)s.i++;
+  let el=document.getElementById('auclive');if(!el){el=document.createElement('div');el.id='auclive';document.body.appendChild(el)}
+  if(s.i>=s.lots.length){aucFinish();return}
+  aucStartLot();
+}
+function aucStartLot(){
+  const s=S.aucS,L=s.lots[s.i];const p=P(L.pid);
+  if(!p||p.t!==L.from){L.done=true;L.res='Lote retirado';s.i++;openAucLive();return}
+  aucRivs(L);L.left=AUC_T0;L.msg='Lances abertos!';
+  clearInterval(AUCT);AUCT=setInterval(aucTick,250);aucPaint();
+}
+function aucTick(){
+  const s=S.aucS;if(!s){clearInterval(AUCT);return}const L=s.lots[s.i];if(!L||L.done)return;
+  L.left-=.25;
+  /* rivais dão lance em momentos aleatórios, mais afoitos no fim */
+  const step=aucStep(L.cur);
+  for(const r of aucRivs(L)){if(L.lead===r.id)continue;const nv=L.lead?L.cur+step:L.cur;if(r.max>=nv&&T(r.id).cash>=nv&&R()<(L.left<2.5?.35:.1)){L.cur=+nv.toFixed(2);L.lead=r.id;L.left=Math.max(L.left,AUC_RESET);L.msg=`${T(r.id).name} dá lance!`;L.flash=Date.now();break}}
+  if(L.left<=0){aucSell();return}
+  L.msg=L.left<=1.2?'Dou-lhe duas…':L.left<=2.4?'Dou-lhe uma…':L.msg;
+  aucPaint();
+}
+function aucBidLive(){
+  const s=S.aucS;if(!s)return;const L=s.lots[s.i];if(!L||L.done||L.lead==='me')return;
+  const nv=L.lead?+(L.cur+aucStep(L.cur)).toFixed(2):L.cur;
+  if(T(S.me).cash<nv)return toast(`Sem caixa: faltam ${money(nv-T(S.me).cash)}.`);
+  if(sqLen(S.me)>=34)return toast('Elenco cheio (34).');
+  L.cur=nv;L.lead='me';L.left=Math.max(L.left,AUC_RESET);L.msg='Seu lance!';L.flash=Date.now();aucPaint();
+}
+function aucSell(){
+  clearInterval(AUCT);const s=S.aucS,L=s.lots[s.i];const p=P(L.pid);L.done=true;
+  if(L.lead==='me'&&T(S.me).cash>=L.cur&&sqLen(S.me)<34&&p.t===L.from){transfer(p,S.me,L.cur);p.w=baseWage(p)*1.1;p.ct=p.a<=21?3:2;p.sgn=S.season;fixMyXI();L.res=`Arrematado por você: ${money(L.cur)}`;L.win='me';news(`Leilão: ${p.n} arrematado por ${money(L.cur)}.`)}
+  else if(L.lead&&L.lead!=='me'&&T(L.lead).cash>=L.cur&&sqLen(L.lead)<32&&p.t===L.from){transfer(p,L.lead,L.cur);L.res=`Vendido ao ${T(L.lead).name}: ${money(L.cur)}`;L.win=L.lead}
+  else{L.res='Sem lances: lote retirado';L.lead=null}
+  L.msg='VENDIDO!';if(!L.win)L.msg='SEM LANCES';
+  save();aucPaint();
+  setTimeout(()=>{if(!S||!S.aucS)return;S.aucS.i++;openAucLive()},1800);
+}
+function aucPass(){const s=S.aucS;if(!s)return;const L=s.lots[s.i];if(!L||L.done)return;if(L.lead==='me')return toast('Você está na frente: espere o martelo.');L.left=Math.min(L.left,1.2)}
+function aucFinish(){
+  clearInterval(AUCT);const s=S.aucS;if(!s)return;s.fin=true;
+  const el=document.getElementById('auclive');if(el)el.innerHTML=aucSummaryHTML();
+}
+function aucClose(){clearInterval(AUCT);const el=document.getElementById('auclive');if(el)el.remove();if(S.aucS&&S.aucS.fin){const got=S.aucS.lots.filter(l=>l.win==='me').map(l=>P(l.pid).n);news(got.length?`Leilão encerrado. Arrematados: ${got.join(', ')}.`:'Sessão de leilão encerrada sem compras suas.');S.aucS=null}save();render()}
 
 
 /* ==================== FIM DE TEMPORADA: ACESSOS, REBAIXAMENTOS E VAGAS ==================== */
@@ -1986,6 +2053,7 @@ function render(){
   main.innerHTML=({jogo:renderJogo,clube:renderClube,elenco:renderElenco,tabela:renderTabela,mercado:renderMercado,gestao:renderGestao,opcoes:renderOpcoes})[UI.tab]();
   if(S.fired){renderFired();return}
   if(showChamp())return;
+  if(S.aucS&&!S.aucS.shown&&!document.getElementById('auclive')){S.aucS.shown=true;openAucLive();return}
   if(UI.summary){const s=UI.summary;UI.summary=null;openSheet(`Fim da temporada ${s.season}`,`
     ${s.titles.length?`<div class="offer"><p class="tiny" style="font-weight:700">🏆 SEUS TÍTULOS</p><p><b>${s.titles.map(esc).join(' · ')}</b></p></div>`:''}
     ${s.moved?`<p class="${/Acesso|Classificado/.test(s.moved)?'up':'dn'}" style="font-weight:700">${esc(s.moved)}</p>`:''}
@@ -2141,6 +2209,25 @@ function renderElenco(){
 }
 
 /* ==================== TABELAS E CHAVES ==================== */
+/* artilharia geral (todas as competições) e líderes de cada campeonato */
+function artGeral(){
+  const md=UI.am||'g',br=UI.ab!=='all';
+  const seg=`<div class="seg">${[['g','Geral'],['c','Por campeonato']].map(([k,n])=>`<button class="${md===k?'on':''}" data-a="am" data-v="${k}">${n}</button>`).join('')}</div>`;
+  const isBR=id=>id&&STN[T(id).reg];
+  if(md==='g'){
+    const comps=Object.values(S.comps);
+    const list=S.players.filter(p=>p.g>0&&(!br||isBR(p.t))).sort((a,b)=>b.g-a.g||a.j-b.j).slice(0,40);
+    const brk=p=>comps.map(c=>[c,(c.gls||{})[p.id]||0]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([c,g])=>`${esc(c.s)} ${g}`).join(' · ');
+    return seg+`<div class="chipset"><button class="chipb ${br?'on':''}" data-a="ab" data-v="br">Clubes do Brasil</button><button class="chipb ${br?'':'on'}" data-a="ab" data-v="all">América do Sul</button></div>
+      <div class="card"><p class="tiny mute">Gols em ${S.season}, somando todas as competições.</p>${list.map((p,i)=>`<div class="pr ${p.t===S.me?'me':''}" data-a="pl" data-v="${p.id}"><span class="arank">${i+1}</span>${crest(p.t,28)}<div class="info"><span class="nm">${esc(p.n)} <span class="tiny mute">${p.p}</span></span><span class="mt">${p.t?esc(T(p.t).name):'Sem clube'}${brk(p)?' · '+brk(p):''}</span></div><span class="agoals">${p.g}</span></div>`).join('')||'<p class="small mute">Ninguém marcou ainda.</p>'}</div>`;
+  }
+  const order=['A','B','C','D','CB','LIB','SUD','NE','SSE','VER'];
+  const mine=new Set(myComps().map(c=>c.id));
+  const cs=Object.values(S.comps).filter(c=>compScorers(c).length&&(mine.has(c.id)||order.includes(c.id)||!br||c.kind==='est')).sort((a,b)=>(mine.has(b.id)-mine.has(a.id))||((order.indexOf(a.id)+99)%99-(order.indexOf(b.id)+99)%99));
+  const shown=cs.filter(c=>br?c.kind!=='ext':true).slice(0,40);
+  return seg+`<div class="chipset"><button class="chipb ${br?'on':''}" data-a="ab" data-v="br">Brasil</button><button class="chipb ${br?'':'on'}" data-a="ab" data-v="all">Todas</button></div>`+
+    (shown.map(c=>{const sc=compScorers(c).slice(0,3);return `<div class="card"><div class="card-h"><h3 class="tlink" data-a="seeart" data-v="${c.id}">${esc(c.n)}</h3>${c.champ?`<span class="st-tag">🏆 ${esc(tname(c.champ))}</span>`:''}</div>${sc.map(([id,g],i)=>{const p=P(id);return `<div class="pr ${p.t===S.me?'me':''}" data-a="pl" data-v="${id}"><span class="arank">${i===0?'🥇':i===1?'🥈':'🥉'}</span>${crest(p.t,24)}<div class="info"><span class="nm">${esc(p.n)}</span><span class="mt">${p.t?esc(T(p.t).name):'Sem clube'}</span></div><span class="agoals">${g}</span></div>`}).join('')}</div>`}).join('')||'<div class="card"><p class="small mute">Os artilheiros por campeonato aparecem conforme os jogos acontecem.</p></div>');
+}
 function compOptions(){
   const C=S.comps;const opt=(id)=>C[id]?`<option value="${id}" ${UI.tc===id?'selected':''}>${esc(C[id].n)}</option>`:'';
   return `<optgroup label="Nacionais">${['A','B','C','D'].map(opt).join('')}<option value="DIST" ${UI.tc==='DIST'?'selected':''}>Distritais (sem série)</option></optgroup>
@@ -2182,9 +2269,10 @@ function distView(){
     return `<div class="card"><div class="card-h"><h3>${STN[u]}</h3><span class="tiny mute">${q} vaga${q>1?'s':''} na Série D</span></div>${ids.map(id=>`<div class="kv small tlink ${id===S.me?'me':''}" data-a="team" data-v="${id}"><span class="tm" style="display:flex;gap:6px;align-items:center">${crest(id,20)}${esc(T(id).name)}</span><span class="${zone.has(id)?'up':'mute'}" style="font-weight:${zone.has(id)?700:400}">${pos(id)<99?(pos(id)+1)+'º no estadual':'fora do estadual'}${zone.has(id)?' · vaga na D':''}</span></div>`).join('')}</div>`}).join('');
 }
 function renderTabela(){
-  if(!UI.tc||(UI.tc!=='DIST'&&!S.comps[UI.tc]))UI.tc=T(S.me).main&&S.comps[T(S.me).main]?T(S.me).main:'A';
+  if(!UI.tc||(UI.tc!=='DIST'&&UI.tc!=='ART'&&!S.comps[UI.tc]))UI.tc=T(S.me).main&&S.comps[T(S.me).main]?T(S.me).main:'A';
   const sel=`<label for="tc" class="small" style="font-weight:600">Competição<select id="tc" data-in="tc">${compOptions()}</select></label>
-    <div class="roles">${myComps().map(c=>`<button class="chipb ${UI.tc===c.id?'on':''}" data-a="seecomp" data-v="${c.id}">${esc(c.s)}</button>`).join('')}</div>`;
+    <div class="roles"><button class="chipb ${UI.tc==='ART'?'on':''}" data-a="seecomp" data-v="ART">⚽ Artilheiros</button>${myComps().map(c=>`<button class="chipb ${UI.tc===c.id?'on':''}" data-a="seecomp" data-v="${c.id}">${esc(c.s)}</button>`).join('')}</div>`;
+  if(UI.tc==='ART')return sel+artGeral();
   if(UI.tc==='DIST')return sel+`<div class="card"><p class="small">Clubes sem série nacional. Disputam o estadual; os mais bem colocados de cada estado (que não estejam nas Séries A, B ou C) ganham vaga na Série D do ano seguinte, e os que caem da Série D voltam para cá.</p></div>`+distView();
   const c=S.comps[UI.tc];const sub=UI.tt;
   const seg=`<div class="seg">${[['class','Classificação'],['rod','Jogos'],['art','Artilharia']].map(([k,n])=>`<button class="${sub===k?'on':''}" data-a="tt" data-v="${k}">${n}</button>`).join('')}</div>`;
@@ -2371,7 +2459,38 @@ function boardCard(compact){
 }
 function aucSessCard(){
   const s=S.aucS;if(!s)return '';const lead=s.lots.filter(l=>l.lead==='me').length;
-  return `<button class="card aucs" data-a="aucs"><span class="aucs-ic">🔨</span><span class="grow"><b>Sessão de leilão aberta</b><span class="small">${s.lots.length} jogadores · ${lead?`você lidera ${lead}`:'termina no próximo jogo'}</span></span><span class="chev">›</span></button>`;
+  return `<button class="card aucs" data-a="aucs"><span class="aucs-ic">🔨</span><span class="grow"><b>Leilão em andamento</b><span class="small">${s.lots.length} jogadores · ${'lote '+((S.aucS.i||0)+1)+' de '+s.lots.length+' · toque para entrar'}</span></span><span class="chev">›</span></button>`;
+}
+function aucLiveHTML(){
+  const s=S.aucS,L=s.lots[s.i];const p=P(L.pid);const n=s.lots.length;
+  const lead=L.lead==='me'?`<b class="al-me">VOCÊ</b>`:L.lead?`${crest(L.lead,22)}<b>${esc(T(L.lead).name)}</b>`:'<span class="mute">ninguém</span>';
+  const nx=L.lead?L.cur+aucStep(L.cur):L.cur;const pct=clamp(L.left/AUC_T0*100,0,100);
+  const sold=L.done;const fresh=L.flash&&Date.now()-L.flash<400;
+  return `<div class="al-wrap"><div class="al">
+    <div class="al-top"><span>🔨 LEILÃO</span><span>Lote ${s.i+1} de ${n}</span></div>
+    <div class="al-pl">${ovr(p.o)}<div class="grow"><b class="al-nm">${esc(p.n)}</b><p class="small">${rpill(p.p)} ${RN[p.p]} · ${p.a} anos · ${starsHTML(p)}</p><p class="tiny mute">${L.from?`${crest(L.from,16)} ${esc(T(L.from).name)}`:'Sem clube'} · valor ${money(value(p))}${p.g?` · ⚽ ${p.g}`:''}</p></div></div>
+    <div class="al-bid ${fresh?'flash':''}"><small>LANCE ATUAL</small><b>${money(L.cur)}</b><div class="al-lead">${L.lead?'Na frente: ':''}${lead}</div></div>
+    <div class="al-bar"><i style="width:${sold?0:pct}%"></i></div>
+    <p class="al-msg ${sold?(L.win==='me'?'up':'dn'):''}">${sold?esc(L.res):esc(L.msg||'')}</p>
+    ${sold?'':`<div class="row" style="gap:8px"><button class="btn pri big grow" data-a="albid" ${L.lead==='me'?'disabled':''}>${L.lead==='me'?'Você lidera':`Dar lance ${money(nx)}`}</button></div>
+    <div class="row" style="gap:8px"><button class="btn sm grow" data-a="alpass">${L.lead==='me'?'Aguardando o martelo…':'Passar este lote'}</button></div>`}
+    <p class="tiny mute" style="text-align:center">Caixa: ${money(T(S.me).cash)} · elenco ${sqLen(S.me)}/34</p></div></div>`;
+}
+/* atualiza só as partes que mudam: os botões não são recriados (senão o toque se perde) */
+function aucPaint(){
+  const el=document.getElementById('auclive');const s=S.aucS;if(!el||!s||!s.lots[s.i])return;const L=s.lots[s.i];
+  const key=s.i+':'+(L.done?1:0);
+  if(el.dataset.k!==key||!el.querySelector('.al')){el.dataset.k=key;el.innerHTML=aucLiveHTML();return}
+  const t=document.createElement('div');t.innerHTML=aucLiveHTML();
+  ['.al-bid','.al-bar','.al-msg'].forEach(q=>{const a=el.querySelector(q),b=t.querySelector(q);if(a&&b){a.className=b.className;a.innerHTML=b.innerHTML}});
+  ['[data-a=albid]','[data-a=alpass]'].forEach(q=>{const a=el.querySelector(q),b=t.querySelector(q);if(a&&b){if(a.textContent!==b.textContent)a.textContent=b.textContent;a.disabled=b.disabled}});
+  const cx=el.querySelector('.al>p.tiny'),cy=t.querySelector('.al>p.tiny');if(cx&&cy)cx.innerHTML=cy.innerHTML;
+}
+function aucSummaryHTML(){
+  const s=S.aucS;
+  return `<div class="al-wrap"><div class="al"><div class="al-top"><span>🔨 LEILÃO ENCERRADO</span><span>${s.lots.length} lotes</span></div>
+    <div class="list">${s.lots.map(L=>{const p=P(L.pid);return `<div class="pr">${rpill(p.p)}<div class="info"><span class="nm">${esc(p.n)}</span><span class="mt ${L.win==='me'?'up':''}">${esc(L.res||'—')}</span></div>${ovr(p.o)}</div>`}).join('')}</div>
+    <button class="btn pri big" data-a="alclose">Fechar</button></div></div>`;
 }
 function openAucSheet(){
   const s=S.aucS;if(!s){closeSheet();return}
@@ -2817,7 +2936,10 @@ const ACT={
   bg:(v,el,e)=>{if(Date.now()<NOBG)return;if(e.target===el){closeSheet();if(S&&S.fired)render()}},
   aucgo:v=>{const min=parseFloat(($('#auc').value||'').replace(',','.'));if(!(min>0))return toast('Informe um preço mínimo válido.');if(openAuction(+v,min)===false)return;save();render();openPlayer(+v);toast(inWindow()?'Leilão aberto: os lances chegam a cada data.':'Leilão criado: começa quando a janela abrir.')},
   aucacc:v=>acceptAuction(+v),
-  aucs:()=>openAucSheet(),
+  aucs:()=>openAucLive(),
+  albid:()=>aucBidLive(),
+  alpass:()=>aucPass(),
+  alclose:()=>aucClose(),
   abid:v=>aucBid(+v),
   auccancel:v=>{S.auctions=S.auctions.filter(a=>a.pid!==+v);P(+v).sale=false;save();render();openPlayer(+v);toast('Jogador retirado do leilão.')},
   renew:v=>openNeg(+v,'renew'),
@@ -2835,6 +2957,9 @@ const ACT={
   acc:v=>acceptOffer(v),
   rej:v=>{S.inbox=S.inbox.filter(o=>o.id!==+v);save();render()},
   tt:v=>{UI.tt=v;render()},
+  am:v=>{UI.am=v;render()},
+  ab:v=>{UI.ab=v;render()},
+  seeart:v=>{UI.tc=v;UI.tt='art';render();$('#main').scrollTop=0},
   mpos:v=>{UI.mpos=v;render()},
   msort:v=>{UI.msort=v;render()},
   mfree:()=>{UI.mfree=!UI.mfree;render()},
@@ -3001,6 +3126,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="28";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="29";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
