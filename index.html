@@ -1987,8 +1987,15 @@ function openSheet(title,html){
 function closeSheet(){const m=$('#sheet');m.hidden=true;m.innerHTML='';UI.confirm=null}
 function openSlot(i){
   const r=myRoles()[i];const cur=S.lineup.xi[i];const rs=myRoles();
-  const list=squad(S.me).sort((a,b)=>(avail(b)-avail(a))||eff(b,r)-eff(a,r));
-  openSheet(`Escolher ${RN[r].toLowerCase()}`,`<p class="hint">Ordenado pela força real nesta função. Se o escolhido já for titular em outra posição, os dois trocam de lugar.</p><div>${list.map(p=>{const j=S.lineup.xi.indexOf(p.id);const pn=penP(p,r);return `<button class="pick ${p.id===cur?'cur':''}" data-a="setslot" data-v="${i}:${p.id}" ${avail(p)?'':'disabled'}>${rpill(p.p)}<span class="info"><span class="nm">${esc(p.n)}</span><span class="mt">${!avail(p)?(p.inj?'Lesionado':'Suspenso'):j>=0?'Titular em '+rs[j]:'Reserva'}${p.p2?' · também '+p.p2:''}</span></span><span class="effv"><b class="${pn>1?'dn':''}">${eff(p,r)}</b><small>${pn?`força ${p.o} −${pn}`:'na função'}</small></span></button>`}).join('')}</div>`);
+  const nat=p=>penP(p,r)<=1?1:0;
+  const list=squad(S.me).sort((a,b)=>(avail(b)-avail(a))||nat(b)-nat(a)||eff(b,r)-eff(a,r));
+  const rec=list.find(p=>avail(p)&&nat(p));
+  const row=p=>{const j=S.lineup.xi.indexOf(p.id);const pn=penP(p,r);return `<button class="pick ${p.id===cur?'cur':''}" data-a="setslot" data-v="${i}:${p.id}" ${avail(p)?'':'disabled'}>${rpill(p.p)}<span class="info"><span class="nm">${esc(p.n)}${p===rec?' <span class="st-tag">Recomendado</span>':''}</span><span class="mt">${!avail(p)?(p.inj?'Lesionado':'Suspenso'):j>=0?'Titular em '+rs[j]:'Reserva'}${p.p2?' · também '+p.p2:''}</span></span><span class="effv"><b class="${pn>1?'dn':''}">${eff(p,r)}</b><small>${pn?`força ${p.o} −${pn}`:'na função'}</small></span></button>`};
+  const a=list.filter(p=>avail(p)&&nat(p)),b=list.filter(p=>avail(p)&&!nat(p)),c=list.filter(p=>!avail(p));
+  openSheet(`Escolher ${RN[r].toLowerCase()}`,`<p class="hint">Primeiro quem joga nesta função, do melhor para o pior; depois os improvisos. Se o escolhido já for titular em outra posição, os dois trocam de lugar.</p>
+    ${a.length?`<p class="tiny mute" style="font-weight:700">DA POSIÇÃO</p>${a.map(row).join('')}`:''}
+    ${b.length?`<p class="tiny mute" style="font-weight:700;margin-top:8px">IMPROVISADOS</p>${b.map(row).join('')}`:''}
+    ${c.length?`<p class="tiny mute" style="font-weight:700;margin-top:8px">FORA (LESÃO OU SUSPENSÃO)</p>${c.map(row).join('')}`:''}`);
 }
 function openPlayer(pid){
   const p=P(pid);if(!p)return;const mine=p.t===S.me;const xiI=S.lineup.xi.indexOf(p.id);
@@ -2059,7 +2066,7 @@ function renderMatch(){
   if(MS.paused&&!MS.done){
     const on=m.on[me].slice().sort((a,b)=>ROLES.indexOf(a[0])-ROLES.indexOf(b[0]));
     const selRole=MS.selOut?(on.find(x=>x[1]===MS.selOut)||[])[0]:m.gap[me][0];
-    const b=bench(m,me).sort((x,y)=>selRole?eff(y,selRole)-eff(x,selRole):y.o-x.o);
+    const b=bench(m,me).sort((x,y)=>selRole?((penP(y,selRole)<=1)-(penP(x,selRole)<=1))||eff(y,selRole)-eff(x,selRole):y.o-x.o);
     const tm=T(me);const bg=bgOf(tm),fg=fgOn(bg);const RXY={GOL:[50,90],ZAG:[50,74],LD:[88,74],LE:[12,74],VOL:[50,57],MEI:[50,44],MOF:[50,31],PD:[88,31],PE:[12,31],CA:[50,14]};
     const fld=`<div class="field mf">${'<div class="mid"></div><div class="ccl"></div><div class="box t"></div><div class="box b"></div>'}${m.on[me].map(([r,id])=>{const p=P(id);const q=m.posMe[id]||{x:RXY[r][0],y:RXY[r][1]};const pn=penP(p,r);return `<button class="slot mslot ${pn>1?'off':''} ${MS.selOut===id?'sel':''}" style="left:${q.x}%;top:${q.y}%" data-a="sout" data-v="${id}" aria-label="${r}: ${esc(p.n)}"><i style="background:${bg};color:${fg}">${p.o}${pn>1?`<em>−${pn}</em>`:''}</i><b>${r}</b><span>${esc(p.n.split(' ').slice(-1)[0])}</span></button>`}).join('')}${m.gapPos.map(q=>`<div class="slot empty" style="left:${q.x}%;top:${q.y}%"><i>+</i><b>VAGA</b><span>lesão</span></div>`).join('')}${MS.selOut&&!MS.selIn?SPOTS.filter(s=>!m.on[me].some(([r,id])=>{const q=m.posMe[id]||{x:RXY[r][0],y:RXY[r][1]};return q.x===s.x&&q.y===s.y})).map(s=>`<button class="mspot" style="left:${s.x}%;top:${s.y}%" data-a="mspot" data-v="${s.x},${s.y}" aria-label="Mover para ${zoneRole(s.x,s.y)}"><span>${zoneRole(s.x,s.y)}</span></button>`).join(''):''}</div>`;
     const itB=p=>`<button class="bb mb ${MS.selIn===p.id?'sel':''}" data-a="sin" data-v="${p.id}" aria-label="${esc(p.n)}"><i style="background:${bg};color:${fg}">${selRole?eff(p,selRole):p.o}</i><b>${p.p}</b><span>${esc(p.n.split(' ').slice(-1)[0])}</span></button>`;
@@ -2167,7 +2174,7 @@ const ACT={
   tac:v=>{S.lineup.tac=v;save();render()},
   pl:v=>openPlayer(+v),
   close:()=>{closeSheet();if(S&&S.fired)render()},
-  bg:(v,el,e)=>{if(e.target===el){closeSheet();if(S&&S.fired)render()}},
+  bg:(v,el,e)=>{if(Date.now()<NOBG)return;if(e.target===el){closeSheet();if(S&&S.fired)render()}},
   aucgo:v=>{const min=parseFloat(($('#auc').value||'').replace(',','.'));if(!(min>0))return toast('Informe um preço mínimo válido.');if(openAuction(+v,min)===false)return;save();render();openPlayer(+v);toast(inWindow()?'Leilão aberto: os lances chegam a cada data.':'Leilão criado: começa quando a janela abrir.')},
   aucacc:v=>acceptAuction(+v),
   auccancel:v=>{S.auctions=S.auctions.filter(a=>a.pid!==+v);P(+v).sale=false;save();render();openPlayer(+v);toast('Jogador retirado do leilão.')},
@@ -2227,6 +2234,7 @@ const ACT={
 };
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-a]');if(!el||el.disabled)return;
+  if(Date.now()<NOBG&&el.closest('#sheet'))return;
   ACT[el.dataset.a]?.(el.dataset.v,el,e);
 });
 document.addEventListener('change',e=>{
@@ -2254,7 +2262,7 @@ document.addEventListener('input',e=>{
 });
 
 /* ==================== ARRASTAR NO QUADRO ==================== */
-let DRAG=null;
+let DRAG=null,NOBG=0;
 function fieldXY(e){const r=DRAG.rect;return{x:clamp((e.clientX-r.left)/r.width*100,5,95),y:clamp((e.clientY-r.top)/r.height*100,5,95)}}
 function nearestSlot(x,y,skip,maxd){let best=-1,bd=maxd;S.lineup.pos.forEach((q,i)=>{if(i===skip)return;const dx=(q.x-x)*0.68,dy=(q.y-y)*0.86;const d=Math.hypot(dx,dy);if(d<bd){bd=d;best=i}});return best}
 document.addEventListener('pointerdown',e=>{
@@ -2276,7 +2284,8 @@ function endDrag(e,cancel){
   if(!DRAG)return;const d=DRAG;DRAG=null;
   if(d.ghost)d.ghost.remove();
   if(cancel){render();return}
-  if(!d.moved){if(d.kind==='slot')openSlot(d.i);else openPlayer(d.pid);return}
+  /* no celular, o clique que segue o toque cai no fundo da janela recém-aberta e a fechava: ignora por um instante */
+  if(!d.moved){NOBG=Date.now()+600;if(d.kind==='slot')openSlot(d.i);else openPlayer(d.pid);return}
   const {x,y}=(DRAG=d,fieldXY(e));DRAG=null;
   const inside=e.clientX>=d.rect.left&&e.clientX<=d.rect.right&&e.clientY>=d.rect.top&&e.clientY<=d.rect.bottom;
   const xi=S.lineup.xi;
