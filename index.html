@@ -619,6 +619,8 @@ const RN={GOL:'Goleiro',ZAG:'Zagueiro',LD:'Lateral-direito',LE:'Lateral-esquerdo
 const GRP={GOL:'G',ZAG:'D',LD:'D',LE:'D',VOL:'M',MEI:'M',MOF:'M',PD:'A',PE:'A',CA:'A'};
 const GRPL={G:'Goleiros',D:'Defesa',M:'Meio-campo',A:'Ataque'};
 /* ===== camada Elifoot: força 1–50, posição G/D/M/A, craque (*) e comportamento ===== */
+/* estaduais fora do jogo: vagas na Série D, Copa do Brasil e copas regionais saem do ranking de força de cada estado */
+const NOEST=true;
 const FZ=o=>Math.max(1,Math.min(50,Math.round((o-45)*50/45)));
 const GRPN={G:'Goleiro',D:'Defesa',M:'Médio',A:'Avançado'};
 const COMPN=['Fair Play','Cordeirinho','Cavalheiro','Caneleiro','Caceteiro','Sarrafeiro'];
@@ -833,7 +835,7 @@ function buildComps(P){
   const lib=g=>[rrSpec(g,2),koSpec(16,n=>n>2?2:1,'seed',{k:'grp',size:16})];
   C.LIB=makeComp('LIB',lib(P.LIBg));C.SUD=makeComp('SUD',lib(P.SUDg));
   for(const r of ['NE','SSE','VER'])C[r]=makeComp(r,[rrSpec(P[r+'g'],1),koSpec(8,n=>n>2?1:2,'seed',{k:'grp',size:8})]);
-  for(const u in P.ST){const ids=P.ST[u];if(ids.length<4)continue;const g=ids.length>12?snakeGroups(ids,2):[ids];C['E-'+u]=makeComp('E-'+u,[rrSpec(g,1),koSpec(4,n=>n>2?1:2,'seed',{k:'grp',size:4})])}
+  if(NOEST)for(const u in {}){}else for(const u in P.ST){const ids=P.ST[u];if(ids.length<4)continue;const g=ids.length>12?snakeGroups(ids,2):[ids];C['E-'+u]=makeComp('E-'+u,[rrSpec(g,1),koSpec(4,n=>n>2?1:2,'seed',{k:'grp',size:4})])}
   for(const u in P.EX){const ids=P.EX[u];C['X-'+u]=makeComp('X-'+u,[rrSpec([ids],ids.length<=20?2:1)])}
   return C;
 }
@@ -1035,7 +1037,7 @@ function initQuotas(){
   return{D:qD,CB:quotaOf(INIT.CB.filter(id=>!ab.has(id))),NE:quotaOf(INIT.NEg.flat()),SSE:quotaOf(INIT.SSEg.flat()),VER:quotaOf(INIT.VERg.flat()),G:{NE:INIT.NEg.length,SSE:INIT.SSEg.length,VER:INIT.VERg.length}};
 }
 function newGame(tid,coach){
-  S={v:5,season:2026,me:tid,coach:coach||'Técnico',teams:{},players:[],nextId:1,news:[],hist:[],inbox:[],auctions:[],sat:60,coachPool:[],finS:{},triedC:{},tried:{},fired:null,fin:null,
+  S={v:5,noest:1,season:2026,me:tid,coach:coach||'Técnico',teams:{},players:[],nextId:1,news:[],hist:[],inbox:[],auctions:[],sat:60,coachPool:[],finS:{},triedC:{},tried:{},fired:null,fin:null,
     lineup:{form:'4-2-3-1',tac:'equ',xi:[],pos:presetPos('4-2-3-1')},d:0,cal:[],comps:{},my:[],titles:[],mon:null,P:null,quota:initQuotas()};
   TEAMS.forEach(([id,name,code,c1,c2,cap,st,city,coach,reg,rep])=>{
     const t={id,name,code,c1,c2,rep,cap,reg,stad:st,city,coach:coach||'Interino',cash:+(2+rep*rep/100*.7).toFixed(1),form:AIFORMS[(+id)%4],last:[],mp:0,div:STN[reg]?'E':'X',main:null,gm:0,gbox:0,gpub:0,ghome:0};
@@ -1057,7 +1059,7 @@ function newGame(tid,coach){
 function setDivs(P){
   Object.values(S.teams).forEach(t=>{t.div=STN[t.reg]?'E':'X'});
   NATS.forEach(k=>P[k].forEach(id=>{if(S.teams[id])S.teams[id].div=k}));
-  Object.values(S.teams).forEach(t=>{t.main=t.div==='X'?'X-'+t.reg:t.div==='E'?(P.ST[t.reg]&&P.ST[t.reg].includes(t.id)?'E-'+t.reg:null):t.div});
+  Object.values(S.teams).forEach(t=>{t.main=t.div==='X'?'X-'+t.reg:t.div==='E'?(!NOEST&&P.ST[t.reg]&&P.ST[t.reg].includes(t.id)?'E-'+t.reg:null):t.div});
 }
 function startSeason(P){
   S.P=P;S.comps=buildComps(P);S.cal=buildCalendar(S.season,S.comps);
@@ -1293,7 +1295,9 @@ function matchPost(m,c){
 }
 /* avança até a data do seu próximo jogo; devolve o jogo ou null se a temporada acabou */
 /* competição em que você jogou nesta temporada, tem jogos hoje e você está fora (eliminado) */
-function spectComp(d){if(S.spect===false)return null;return compsOn(d).find(c=>c.st&&c.st.t==='ko'&&compTeams(c).includes(S.me)&&compFixtures(c).length&&!compFixtures(c).some(([h,a])=>h===S.me||a===S.me))||null}
+/* eliminado = perdeu algum confronto de mata-mata nesta competição (quem ainda vai estrear não conta) */
+function knockedOut(c){return c.done.concat(c.st?[c.st]:[]).some(st=>st.t==='ko'&&st.rounds.some(rd=>(rd.ties||[]).some(t=>t.w&&t.w!==S.me&&(t.a===S.me||t.b===S.me))))||c.done.some(st=>st.t==='rr')&&!(c.st&&c.st.pool&&c.st.pool.includes(S.me))&&c.st&&c.st.t==='ko'&&compTeams(c).includes(S.me)&&c.done.some(st=>st.t==='rr'&&st.groups.some(g=>g.tb[S.me])) }
+function spectComp(d){if(S.spect===false)return null;return compsOn(d).find(c=>c.st&&c.st.t==='ko'&&compTeams(c).includes(S.me)&&knockedOut(c)&&compFixtures(c).length&&!compFixtures(c).some(([h,a])=>h===S.me||a===S.me))||null}
 function advanceToMine(stopSpect){
   let guard=0;
   while(S.d<S.cal.length&&guard++<200){
@@ -1532,8 +1536,8 @@ function devTick(){
     const share=clamp(p.j/mp,0,1);let d=0;
     /* share = jogos em que entrou / jogos do time: entrar em campo conta igual, seja 1 minuto ou 90 */
     const star=isStar(p);
-    if(p.a<=23){if(p.o<p.pot&&R()<.12+.5*share){d=1;if(p.a<=21&&share>.35&&R()<.4)d=2}}
-    else if(p.a<=26){if(p.o<p.pot&&R()<.08+.22*share)d=1}
+    if(p.a<=23){if(p.o<p.pot&&R()<.22+.42*share){d=1;if(p.a<=21&&share>.35&&R()<.4)d=2}}
+    else if(p.a<=26){if(p.o<p.pot&&R()<.1+.2*share)d=1}
     else if(star&&p.a<=32){if(p.o<Math.max(p.pot,p.o0+3)&&R()<.06+.14*share)d=1}
     else if(star&&p.a<=34){if(share<.1&&R()<.03)d=-1}
     else if(p.a<=29){if(p.o<p.pot&&R()<.055+.11*share)d=1;else if(R()<.022+(share<.15?.045:0))d=-1}
@@ -1843,7 +1847,7 @@ function statePicks(quota,exclude,R_){
   const out=[];
   for(const u of Object.keys(quota)){
     let list=(R_['E-'+u]||[]).filter(id=>!exclude.has(id));
-    const extra=Object.values(S.teams).filter(t=>t.reg===u&&!exclude.has(t.id)&&!list.includes(t.id)).sort((a,b)=>b.rep-a.rep).map(t=>t.id);
+    const extra=Object.values(S.teams).filter(t=>t.reg===u&&!exclude.has(t.id)&&!list.includes(t.id)).sort((a,b)=>(teamAvg(b.id)+b.rep/10)-(teamAvg(a.id)+a.rep/10)).map(t=>t.id);
     list=list.concat(extra).slice(0,quota[u]);list.forEach(id=>{out.push(id);exclude.add(id)});
   }
   return out;
@@ -2012,6 +2016,7 @@ function useState(obj){
   S.auctions=S.auctions||[];S.coachPool=S.coachPool||[];S.finS=S.finS||{};S.triedC=S.triedC||{};S.tried=S.tried||{};if(S.fired===undefined)S.fired=null;
   if(!S.lineup.pos||S.lineup.pos.length!==11||!S.lineup.xi||S.lineup.xi.length!==11){S.lineup.form='4-2-3-1';S.lineup.pos=presetPos('4-2-3-1');S.lineup.xi=elPick(S.me,"4-4-2")}
   S.lineup.pos=S.lineup.pos.map(q=>snap(q.x,q.y));
+  if(NOEST&&!S.noest){Object.keys(S.comps).filter(k=>k.startsWith('E-')).forEach(k=>delete S.comps[k]);Object.values(S.teams).forEach(t=>{if(t.main&&String(t.main).startsWith('E-'))t.main=null});S.noest=1}
   if(!S.gems){seedGems();S.gems=1;save()}
   if(!S.wfix){S.players.forEach(p=>{if(p.t)p.w=baseWage(p)*(.9+R()*.2)});S.wfix=1}
   UI.tab='clube';UI.tc=null;
@@ -2186,7 +2191,7 @@ function renderStart(){
     <p class="tiny mute" style="font-weight:700;margin:4px 0 0">SALVAR EM</p>
     <div class="chipset">${SLOTS.map(n=>`<button class="chipb ${UI.ns===n?'on':''}" data-a="nslot" data-v="${n}">${n} · ${infos[n]&&!infos[n].broken?esc(infos[n].name):'vazio'}</button>`).join('')}</div>
     ${infos[UI.ns]&&!infos[UI.ns].broken?`<p class="tiny dn">O espaço ${UI.ns} já tem o jogo do ${esc(infos[UI.ns].name)}. Começar aqui substitui esse jogo (vai pedir confirmação).</p>`:''}
-    <div class="chipset">${[['A','Série A'],['B','Série B'],['C','Série C'],['D','Série D'],['E','Distritais'],['X','Exterior']].map(([k,n])=>`<button class="chipb ${UI.pk===k&&!q?'on':''}" data-a="pk" data-v="${k}">${n}</button>`).join('')}</div>
+    <div class="chipset">${[['A','Série A'],['B','Série B'],['C','Série C'],['D','Série D'],['X','Exterior']].map(([k,n])=>`<button class="chipb ${UI.pk===k&&!q?'on':''}" data-a="pk" data-v="${k}">${n}</button>`).join('')}</div>
     ${q?'':sel}
     <div class="search">${ICONS.search}<input type="text" id="cq" data-in="cq" placeholder="Buscar clube" value="${esc(UI.cq)}" aria-label="Buscar clube"></div>
     <div class="teams" id="tlist">${list.map(x=>`<button class="tp" data-a="pick" data-v="${x.id}">${crest(x.id,36)}<span class="t"><b>${esc(x.t.name)}</b><span class="tiny mute">Força ${fAvg(x.avg)}${q||UI.pk==='E'?` · ${esc(STN[x.t.reg]||EXN[x.t.reg]||'')}`:''}</span><span class="bar"><i style="width:${clamp((x.avg-48)/34*100,6,100)}%"></i></span></span></button>`).join('')||'<p class="small mute">Nenhum clube.</p>'}</div>
@@ -2311,7 +2316,7 @@ function compOptions(){
   const C=S.comps;const opt=(id)=>C[id]?`<option value="${id}" ${UI.tc===id?'selected':''}>${esc(C[id].n)}</option>`:'';
   return `<optgroup label="Nacionais">${['A','B','C','D'].map(opt).join('')}<option value="DIST" ${UI.tc==='DIST'?'selected':''}>Distritais (sem série)</option></optgroup>
     <optgroup label="Copas">${['CB','LIB','SUD','NE','SSE','VER'].map(opt).join('')}</optgroup>
-    <optgroup label="Estaduais">${Object.keys(STN).sort((a,b)=>STN[a].localeCompare(STN[b])).map(u=>opt('E-'+u)).join('')}</optgroup>
+
     <optgroup label="Exterior">${EXORD.map(u=>opt('X-'+u)).join('')}</optgroup>`;
 }
 function rrTable(c,st,g,gi){
@@ -2352,7 +2357,7 @@ function renderTabela(){
   const sel=`<label for="tc" class="small" style="font-weight:600">Competição<select id="tc" data-in="tc">${compOptions()}</select></label>
     <div class="roles"><button class="chipb ${UI.tc==='ART'?'on':''}" data-a="seecomp" data-v="ART">⚽ Artilheiros</button>${myComps().map(c=>`<button class="chipb ${UI.tc===c.id?'on':''}" data-a="seecomp" data-v="${c.id}">${esc(c.s)}</button>`).join('')}</div>`;
   if(UI.tc==='ART')return sel+artGeral();
-  if(UI.tc==='DIST')return sel+`<div class="card"><p class="small">Clubes sem série nacional. Disputam o estadual; os mais bem colocados de cada estado (que não estejam nas Séries A, B ou C) ganham vaga na Série D do ano seguinte, e os que caem da Série D voltam para cá.</p></div>`+distView();
+  if(UI.tc==='DIST')return sel+`<div class="card"><p class="small">Clubes sem série nacional. Não há estaduais: os mais fortes de cada estado (fora das Séries A, B e C) ganham vaga na Série D do ano seguinte, e os que caem da Série D voltam para cá.</p></div>`+distView();
   const c=S.comps[UI.tc];const sub=UI.tt;
   const seg=`<div class="seg">${[['class','Classificação'],['rod','Jogos'],['art','Artilharia']].map(([k,n])=>`<button class="${sub===k?'on':''}" data-a="tt" data-v="${k}">${n}</button>`).join('')}</div>`;
   const head=`<div class="card"><div class="card-h"><h3>${esc(c.n)}</h3>${c.champ?`<span class="st-tag">🏆 ${esc(tname(c.champ))}</span>`:''}</div><p class="tiny mute">${c.fin?'Encerrada':c.st?(c.st.t==='ko'?c.st.rounds[c.st.r].n:`${c.stages.length>1?`Fase ${c.si+1} · `:''}rodada ${c.st.j+1} de ${c.st.nd}`):''} · ${c.dates.length?`${dLabel(S.cal[c.dates[0]])} a ${dLabel(S.cal[c.dates[c.dates.length-1]])}`:''}</p></div>`;
@@ -2408,8 +2413,8 @@ function renderOpcoes(){
   return `
   <div class="card"><div class="card-h"><h3>Copas em que você caiu</h3><button class="btn sm ${S.spect===false?'':'on'}" data-a="spon">${S.spect===false?'Desligado':'Ligado'}</button></div><p class="small">Quando ligado, as rodadas das copas em que você foi eliminado param para você assistir (ou simular).</p></div>
   <div class="card"><h3>Calendário da temporada</h3>
-    <p class="small">Janeiro a abril: estaduais aos domingos, copas regionais (Nordeste, Sul-Sudeste, Verde) e as primeiras fases da Copa do Brasil no meio de semana. De maio a dezembro: Séries A a D e as ligas sul-americanas, intercaladas com Libertadores, Sul-Americana e o mata-mata da Copa do Brasil.</p>
-    <p class="small">Fim de temporada: 4 sobem e 4 caem entre A, B e C. Na Série C, os 8 primeiros fazem dois quadrangulares (os 2 de cada sobem). Na Série D, os semifinalistas sobem; quem não se reclassifica pelo estadual volta a ser distrital. Vagas continentais: 6 brasileiros na Libertadores (campeão da Copa do Brasil e os melhores da Série A) e os 6 seguintes na Sul-Americana; campeões continentais têm vaga garantida.</p></div>
+    <p class="small">Janeiro a abril: copas regionais (Nordeste, Sul-Sudeste, Verde) e as primeiras fases da Copa do Brasil no meio de semana. De maio a dezembro: Séries A a D e as ligas sul-americanas, intercaladas com Libertadores, Sul-Americana e o mata-mata da Copa do Brasil.</p>
+    <p class="small">Fim de temporada: 4 sobem e 4 caem entre A, B e C. Na Série C, os 8 primeiros fazem dois quadrangulares (os 2 de cada sobem). Na Série D, os semifinalistas sobem; as vagas restantes da Série D, da Copa do Brasil e das copas regionais vão para os clubes mais fortes de cada estado (não há estaduais). Vagas continentais: 6 brasileiros na Libertadores (campeão da Copa do Brasil e os melhores da Série A) e os 6 seguintes na Sul-Americana; campeões continentais têm vaga garantida.</p></div>
   <div class="card"><h3>Funções e improviso</h3>
     <p class="small">Cada jogador tem uma função principal e, às vezes, uma secundária: ${ROLES.map(r=>`<b>${r}</b> ${RN[r].toLowerCase()}`).join(', ')}.</p>
     <p class="small">Fora da função ele perde força. Na secundária perde 1 ponto. Em função vizinha perde 2 a 5. Em outro setor perde 7 a 12, e um jogador de linha no gol perde 30.</p></div>
@@ -3261,7 +3266,7 @@ const refTxt=r=>r>=1.3?'rigoroso':r<=.85?'liberal':'normal';
    o lance vira duelo atacante × defensor; vencendo, sai o remate: gol, defesa, poste, barra ou fora. */
 const ELB=.128;
 /* zebra: piso somado às forças nos duelos e na criação de lances (maior = mais surpresas) */
-const ZB=24,ZA=240;
+const ZB=13,ZA=130;
 /* posturas: multiplicam ataque e defesa do time */
 const POST={udf:{n:'Ultradefensivo',a:.7,d:1.32},def:{n:'Defensivo',a:.86,d:1.15},equ:{n:'Equilibrado',a:1,d:1},ofe:{n:'Ofensivo',a:1.15,d:.87},uof:{n:'Ultraofensivo',a:1.32,d:.72}};
 ['udf','uof'].forEach(k=>{if(!TAC[k])TAC[k]={own:1,opp:1,n:POST[k].n}});
@@ -3472,6 +3477,6 @@ Object.assign(ACT,{
 Object.assign(ACT,{elpost:v=>{S.lineup.tac=v;save();render()}});
 
 </script>
-<script>const APPV="31";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="32";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
