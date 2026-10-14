@@ -1,4 +1,4 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#0c8546"><title>Tático 26</title><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="Tático 26"><style>[hidden]{display:none!important}body{margin:0}</style></head><body><title>Tático 26</title>
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#0c8546"><title>Tático 26</title><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="Tático 26"><style>[hidden]{display:none!important}body{margin:0}</style></head><body><title>Tático 26</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
 <style>
@@ -373,6 +373,9 @@ label select{display:block;width:100%;margin-top:6px}
 .qs .x{background:#0b1825;border:1px solid #1f3446;color:#8ea4b8;border-radius:50%;width:32px;height:32px}
 .qs em.rec{font-style:normal;font-size:11px;color:#35d07f;font-weight:700;margin-left:4px}
 .presets{display:flex;flex-direction:column;gap:6px}
+/* sem zoom de toque duplo; campos com 16px para o iPhone não ampliar ao focar */
+html,body{touch-action:manipulation}
+input,select,textarea{font-size:16px}
 
 </style>
 
@@ -2421,7 +2424,7 @@ document.addEventListener('pointermove',e=>{
   const b=MD.el.querySelector('b');if(b)b.textContent=zoneRole(snap(x,y).x,snap(x,y).y);
 },{passive:false});
 function endMDrag(e,cancel){
-  if(!MD)return;const d=MD;MD=null;clearTimeout(d.timer);if(d.long){NOMC=Date.now()+500;return}if(!d.moved)return;
+  if(!MD)return;const d=MD;MD=null;clearTimeout(d.timer);if(d.long){NOMC=Date.now()+350;return}if(!d.moved)return;
   NOMC=Date.now()+450;
   if(cancel||!MS){renderMatch();return}
   const sn=snap(d.x,d.y);const m=MS.mine;
@@ -2432,12 +2435,16 @@ function endMDrag(e,cancel){
 document.addEventListener('pointerup',e=>endMDrag(e,false));
 document.addEventListener('pointercancel',e=>endMDrag(e,true));
 
+/* sem zoom por toque duplo */
+document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
+let _lt=0;document.addEventListener('touchend',e=>{const n=Date.now();if(n-_lt<320&&!e.target.closest('input,textarea,select'))e.preventDefault();_lt=n},{passive:false});
+
 /* ==================== INÍCIO ==================== */
 function start(){try{const d=window.claude?.hot?.data;if(d&&d.raw)useState(unpackS(d.raw))}catch(e){S=null}render()}
 window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="12";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="13";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
