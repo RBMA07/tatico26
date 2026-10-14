@@ -582,6 +582,21 @@ const KONAME={2:'Final',4:'Semifinal',8:'Quartas de final',16:'Oitavas de final'
 function snakeGroups(ids,g){const s=ids.slice().sort((a,b)=>S.teams[b].rep-S.teams[a].rep);const out=Array.from({length:g},()=>[]);s.forEach((id,i)=>{const r=Math.floor(i/g);out[r%2?g-1-(i%g):i%g].push(id)});return out}
 function koSpec(size,legsFn,draw,from){const rounds=[];let n=size,ph=1;while(n>=2){rounds.push({n:KONAME[n]||(ph+'ª fase'),legs:legsFn(n)});n/=2;ph++}return{t:'ko',from,rounds,draw,nd:rounds.reduce((s,r)=>s+r.legs,0)}}
 function rrSpec(groups,legs){return{t:'rr',groups,legs,nd:Math.max(...groups.map(g=>rrRounds(g.length,legs)))}}
+/* Copa do Brasil no formato 2026: 1ª fase só com os de pior ranking; os demais entram aos poucos;
+   Série A entra na 5ª fase. Fases 1–4 em jogo único, com potes por ranking (forte x fraco);
+   da 5ª fase à semifinal, ida e volta; final em jogo único, campo neutro. */
+const cbRankV=id=>({A:4,B:3,C:2,D:1}[S.teams[id].div]||0)*100+S.teams[id].rep;
+function cbSpec(P){
+  let ids=P.CB.slice().sort((a,b)=>cbRankV(b)-cbRankV(a));
+  const A=ids.filter(id=>S.teams[id].div==='A');let rest=ids.filter(id=>S.teams[id].div!=='A');
+  /* 5ª fase = 32 clubes: os 20 da Série A + 12 que vêm da 4ª fase (24 = 22 da 3ª + 2 que entram) */
+  let p1=2*(ids.length-124)+28;if(p1<0)p1=0;if(p1%2)p1--;
+  const e4=rest.slice(0,2),e2=rest.slice(2,rest.length-p1),f1=rest.slice(rest.length-p1);
+  const R=[{n:'1ª fase',legs:1,pots:1},{n:'2ª fase',legs:1,pots:1},{n:'3ª fase',legs:1,pots:1},{n:'4ª fase',legs:1,pots:1},{n:'5ª fase',legs:2},{n:'Oitavas de final',legs:2},{n:'Quartas de final',legs:2},{n:'Semifinal',legs:2},{n:'Final',legs:1,neutral:1}];
+  if(!f1.length)R.shift();
+  const ent={};const off=f1.length?0:-1;ent[1+off]=e2;ent[3+off]=e4;ent[4+off]=A;
+  return{t:'ko',rounds:R,draw:'pots',teams:f1.length?f1:e2,entries:f1.length?ent:{[2+off]:e4,[3+off]:A},nd:R.reduce((s,r)=>s+r.legs,0)};
+}
 function makeComp(id,stages){const m=compMeta(id);return{id,n:m.n,s:m.s,kind:m.k,stages,si:-1,st:null,done:[],k:0,dates:[],champ:null,fin:false}}
 function buildComps(P){
   const C={};
@@ -590,8 +605,7 @@ function buildComps(P){
   C.C=makeComp('C',[rrSpec([P.C],1),{t:'rr',from:{k:'top',n:8,gs:4},legs:2,nd:6},koSpec(2,()=>2,'seed',{k:'grp',size:2})]);
   C.D=makeComp('D',[rrSpec(P.Dg,2),koSpec(32,()=>2,'seed',{k:'grp',size:32})]);
   C.D.stages[1].rounds[0].n='Segunda fase';
-  const cbSize=Math.pow(2,Math.ceil(Math.log2(P.CB.length)));
-  C.CB=makeComp('CB',[{...koSpec(cbSize,n=>n>16?1:2,'rand',null),teams:P.CB}]);
+  C.CB=makeComp('CB',[cbSpec(P)]);
   const lib=g=>[rrSpec(g,2),koSpec(16,n=>n>2?2:1,'seed',{k:'grp',size:16})];
   C.LIB=makeComp('LIB',lib(P.LIBg));C.SUD=makeComp('SUD',lib(P.SUDg));
   for(const r of ['NE','SSE','VER'])C[r]=makeComp(r,[rrSpec(P[r+'g'],1),koSpec(8,n=>n>2?1:2,'seed',{k:'grp',size:8})]);
@@ -608,7 +622,7 @@ const MESF=['janeiro','fevereiro','março','abril','maio','junho','julho','agost
 const DOW=['dom','seg','ter','qua','qui','sex','sáb'],MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 function mergeProp(a,na,b,nb){const out=[];let i=0,j=0;while(i<na||j<nb){if(j>=nb||(i<na&&(i+1)/na<=(j+1)/nb))out.push(a),i++;else out.push(b),j++}return out}
 function buildCalendar(year,C){
-  const cbR=C.CB.stages[0].rounds;const cb1=cbR.filter(r=>r.legs===1).length,cb2=cbR.filter(r=>r.legs===2).reduce((s,r)=>s+r.legs,0);
+  const cbR=C.CB.stages[0].rounds;const fi=cbR.findIndex(r=>r.legs===2);const cb1=fi<0?cbR.length:fi,cb2=cbR.slice(cb1).reduce((s,r)=>s+r.legs,0);
   const contND=Math.max(C.LIB?compND(C.LIB):0,C.SUD?compND(C.SUD):0);
   const mb=mergeProp('C',contND,'Y',cb2);
   const lanes=[];for(let i=0;i<16;i++)lanes.push('EA','MA');
@@ -624,7 +638,7 @@ function buildCalendar(year,C){
     else if(c.kind==='reg')c.dates=MA.slice(0,nd);
     else if(c.kind==='liga'||c.kind==='ext')c.dates=L.slice(0,nd);
     else if(c.kind==='cont')c.dates=mbC.slice(0,nd);
-    else if(c.id==='CB'){const a=[];let mi=10;for(let r=0;r<cb1;r++){a.push(MA[Math.min(mi,MA.length-1)]);mi+=2}c.dates=a.concat(mbY.slice(0,cb2))}
+    else if(c.id==='CB'){const a=[];let mi=16-2*cb1+1;if(mi<9)mi=9;for(let r=0;r<cb1;r++){a.push(MA[Math.min(mi,MA.length-1)]);mi+=2}c.dates=a.concat(mbY.slice(0,cb2))}
     if(c.dates.length<nd)console.warn('calendário curto',c.id,c.dates.length,nd);
   }
   return cal;
@@ -634,7 +648,7 @@ const dLabel=(c,long)=>c?`${DOW[c.w]} ${c.dd} ${MES[c.m]}${long?' '+c.y:''}`:'';
 /* ==================== FASES: INÍCIO, JOGOS, RESULTADOS ==================== */
 function startStage(c){
   c.si++;const sp=c.stages[c.si];if(!sp){c.fin=true;return}
-  if(c.si===0)c.all=sp.groups?sp.groups.flat():sp.teams.slice();
+  if(c.si===0)c.all=sp.groups?sp.groups.flat():sp.teams.concat(...Object.values(sp.entries||{}));
   if(sp.t==='rr'){
     let groups=sp.groups;
     if(!groups){const prev=c.st;const top=groupTable(prev.groups[0]).slice(0,sp.from.n).map(r=>r.id);const g=sp.from.n/sp.from.gs;groups=Array.from({length:g},()=>[]);top.forEach((id,i)=>{const r=Math.floor(i/g);groups[r%2?g-1-(i%g):i%g].push(id)})}
@@ -643,7 +657,7 @@ function startStage(c){
     let pool;
     if(sp.teams)pool=sp.teams.slice();
     else{const prev=c.st;pool=qualifiers(prev,sp.from.size)}
-    c.st={t:'ko',nd:sp.nd,rounds:sp.rounds.map(r=>({n:r.n,legs:r.legs,ties:null})),r:0,l:0,draw:sp.draw,pool,size:Math.pow(2,sp.rounds.length)};
+    c.st={t:'ko',nd:sp.nd,rounds:sp.rounds.map(r=>({n:r.n,legs:r.legs,ties:null,pots:r.pots||0,neutral:r.neutral||0})),r:0,l:0,draw:sp.draw,pool,size:Math.pow(2,sp.rounds.length),ent:sp.entries||null};
   }
 }
 /* classificados dos grupos, já ordenados por campanha (1º colocados primeiro) */
@@ -657,6 +671,18 @@ function qualifiers(st,size){
 }
 function drawRound(c){
   const st=c.st,rd=st.rounds[st.r];let pool=st.pool.slice();const ties=[];
+  if(st.ent&&st.ent[st.r]){pool=pool.concat(st.ent[st.r]);st.pool=pool.slice()}
+  if(st.draw==='pots'){
+    pool.sort((a,b)=>cbRankV(b)-cbRankV(a));
+    if(pool.length%2){const w=pool.shift();ties.push({a:w,b:null,ga:0,gb:0,w,bye:1})}
+    const n=pool.length;
+    if(rd.pots){
+      /* potes por ranking: o pote mais forte enfrenta o mais fraco (A x H, B x G…) */
+      const np=[8,4,2].find(k=>n%k===0&&(n/k)>=1)||2;const sz=n/np;const pots=Array.from({length:np},(_,k)=>shuffle(pool.slice(k*sz,(k+1)*sz)));
+      for(let k=0;k<np/2;k++){const A_=pots[k],B_=pots[np-1-k];for(let i=0;i<sz;i++){let a=A_[i],b=B_[i];if(R()<.5)[a,b]=[b,a];ties.push({a,b,ga:0,gb:0,w:null})}}
+    }else{shuffle(pool);for(let i=0;i+1<n;i+=2)ties.push({a:pool[i],b:pool[i+1],ga:0,gb:0,w:null})}
+    rd.ties=ties;return;
+  }
   if(st.draw==='rand'){
     const byes=st.r===0?st.size-pool.length:0;
     if(byes>0){pool.sort((a,b)=>S.teams[b].rep-S.teams[a].rep);pool.splice(0,byes).forEach(id=>ties.push({a:id,b:null,ga:0,gb:0,w:id,bye:1}))}
@@ -719,6 +745,7 @@ function compStatus(c,id){
         if(t.w===id){const nx=st.rounds[r+1];return nx?nx.n:'Campeão'}
         return rd.n}
       if(st===c.st&&!c.fin&&st.pool.includes(id))return st.rounds[st.r].n;
+      if(st===c.st&&!c.fin&&st.ent){const er=Object.keys(st.ent).map(Number).find(r=>r>=st.r&&st.ent[r].includes(id)&&!(st.rounds[r].ties));if(er!=null)return 'Estreia na '+st.rounds[er].n.toLowerCase()}
     }else{
       const g=st.groups.find(g=>g.tb[id]);if(!g)continue;
       const pos=groupTable(g).findIndex(r=>r.id===id)+1;const gl=st.groups.length>1?'Grupo '+String.fromCharCode(65+st.groups.indexOf(g))+' · ':'';
@@ -870,6 +897,7 @@ function impOf(c){
   return({est:.55+.5*late,reg:.6+.45*late,copa:.75+.5*late,cont:.95+.35*late,liga:1,ext:1})[c.kind]||1;
 }
 function gateFor(h,c,a,rand){const t=T(h);const base=attendance(t,t.price,rankOf(h),a,impOf(c));const pub=Math.min(capNow(t),Math.round(base*(rand?(.95+R()*.1):1)));return{pub,occ:capNow(t)?pub/capNow(t):0}}
+const isNeutral=c=>!!(c&&c.st&&c.st.t==='ko'&&c.st.rounds[c.st.r]&&c.st.rounds[c.st.r].neutral);
 const XC={};
 const clearXC=()=>{for(const k in XC)delete XC[k]};
 function aiOn(t){if(!XC[t]){const f=T(t).form,rs=roles(f);XC[t]=autoXI(t,f).map((id,i)=>[rs[i],id]).filter(x=>x[1])}return XC[t]}
@@ -878,12 +906,12 @@ function makeMatch(h,a,c){
   const lin=t=>({on:t===S.me?myOn():aiOn(t).slice(),tac:t===S.me?S.lineup.tac:'equ'});
   const lh=lin(h),la=lin(a);const g=gateFor(h,c,a,true);
   const posMe={},gapPos=[];if(h===S.me||a===S.me)S.lineup.xi.forEach((id,i)=>{if(id)posMe[id]={...S.lineup.pos[i]}});
-  return{c:c.id,posMe,gapPos,h,a,pub:g.pub,occ:g.occ,on:{[h]:lh.on,[a]:la.on},tac:{[h]:lh.tac,[a]:la.tac},subs:{[h]:0,[a]:0},down:{[h]:0,[a]:0},left:{[h]:[],[a]:[]},gap:{[h]:[],[a]:[]},app:{[h]:lh.on.map(x=>x[1]),[a]:la.on.map(x=>x[1])},yc:{},newSus:[],gh:0,ga:0,min:0,ev:[],dirty:true,end:90+ri(1,5)};
+  return{c:c.id,neu:isNeutral(c),posMe,gapPos,h,a,pub:g.pub,occ:g.occ,on:{[h]:lh.on,[a]:la.on},tac:{[h]:lh.tac,[a]:la.tac},subs:{[h]:0,[a]:0},down:{[h]:0,[a]:0},left:{[h]:[],[a]:[]},gap:{[h]:[],[a]:[]},app:{[h]:lh.on.map(x=>x[1]),[a]:la.on.map(x=>x[1])},yc:{},newSus:[],gh:0,ga:0,min:0,ev:[],dirty:true,end:90+ri(1,5)};
 }
 function wpick(list,wf){const w=list.map(wf),tot=w.reduce((a,b)=>a+b,0);let r=R()*tot;for(let i=0;i<list.length;i++){r-=w[i];if(r<=0)return list[i]}return list[list.length-1]}
 function stepMatch(m){
   m.min++;
-  if(m.dirty){const sh=strength(m.on[m.h]),sa=strength(m.on[m.a]);m.lH=lam(sh,sa,homeAdv(m.occ),m.tac[m.h],m.tac[m.a]);m.lA=lam(sa,sh,awayAdv(m.occ),m.tac[m.a],m.tac[m.h]);m.dirty=false}
+  if(m.dirty){const sh=strength(m.on[m.h]),sa=strength(m.on[m.a]);m.lH=lam(sh,sa,m.neu?1:homeAdv(m.occ),m.tac[m.h],m.tac[m.a]);m.lA=lam(sa,sh,m.neu?1:awayAdv(m.occ),m.tac[m.a],m.tac[m.h]);m.dirty=false}
   const dh=m.down[m.h]||0,da=m.down[m.a]||0;
   const eH=m.lH*Math.pow(.85,dh)*Math.pow(1.22,da),eA=m.lA*Math.pow(.85,da)*Math.pow(1.22,dh);
   if(R()<eH/90)goal(m,m.h);
@@ -940,7 +968,7 @@ function poissonS(l){const L=Math.exp(-l);let k=0,p=1;do{k++;p*=R()}while(p>L);r
 function quickMatch(h,a,c){
   const oh=h===S.me?myOn():aiOn(h),oa=a===S.me?myOn():aiOn(a);
   const sh=strength(oh),sa=strength(oa);const g=gateFor(h,c,a,true);
-  const gh=poissonS(lam(sh,sa,homeAdv(g.occ),'equ','equ')),ga=poissonS(lam(sa,sh,awayAdv(g.occ),'equ','equ'));
+  const nu=isNeutral(c);const gh=poissonS(lam(sh,sa,nu?1:homeAdv(g.occ),'equ','equ')),ga=poissonS(lam(sa,sh,nu?1:awayAdv(g.occ),'equ','equ'));
   const m={c:c.id,h,a,gh,ga,pub:g.pub,occ:g.occ,ev:[],app:{[h]:oh.map(x=>x[1]),[a]:oa.map(x=>x[1])},newSus:[]};
   [[h,oh,gh],[a,oa,ga]].forEach(([t,on,n])=>{
     for(let i=0;i<n;i++){const [r,id]=wpick(on,([r,id])=>SW[r]*Math.pow(P(id).o/70,2));const p=P(id);p.g++;m.ev.push({min:ri(1,90),t,k:'gol',n:p.n,id})}
@@ -1089,7 +1117,7 @@ function windowText(){return inWindow()?`Janela aberta: negociações até ${win
 /* ==================== PRÊMIOS E TÍTULOS ==================== */
 /* R$ milhões: entry = cota de participação; q = passar da fase de grupos; adv[i] = vencer a fase i do mata-mata; champ = título */
 const PRZ={
-  CB:{entry:.4,adv:[.5,.8,1.5,3,5,8,14],champ:20},
+  CB:{entry:.3,adv:[.2,.3,.4,.6,1.5,3,5,8,14],champ:20},
   LIB:{entry:5,q:3,adv:[4,5,7,10],champ:25},
   SUD:{entry:2,q:1.5,adv:[1.5,2,3,5],champ:10},
   NE:{entry:.5,q:.3,adv:[.4,.6,1],champ:1.5},SSE:{entry:.4,q:.3,adv:[.3,.5,.8],champ:1.2},VER:{entry:.2,q:.2,adv:[.2,.3,.5],champ:.8},
@@ -1587,8 +1615,8 @@ const zcls=(c,i,n)=>{
 function aliveIn(c,id){
   if(c.fin)return false;const st=c.st;if(!st)return false;
   if(st.t==='rr')return st.groups.some(g=>g.tb[id]);
-  const rd=st.rounds[st.r];if(rd.ties)return rd.ties.some(t=>(t.a===id||t.b===id)&&(!t.w||t.w===id));
-  return st.pool.includes(id);
+  const rd=st.rounds[st.r];if(rd.ties)return rd.ties.some(t=>(t.a===id||t.b===id)&&(!t.w||t.w===id))||(st.ent&&Object.keys(st.ent).some(r=>+r>st.r&&st.ent[r].includes(id)));
+  return st.pool.includes(id)||(st.ent&&Object.keys(st.ent).some(r=>+r>=st.r&&st.ent[r].includes(id)));
 }
 function upcoming(id,max){
   const out=[];
@@ -1601,6 +1629,8 @@ function upcoming(id,max){
     }else{
       if(!st.rounds[st.r].ties&&(st.draw==='seed'||c.dates[c.k]===S.d))drawRound(c);
       let r=st.r,l=st.l,k=c.k;
+      const er=st.ent?Object.keys(st.ent).map(Number).find(x=>x>=st.r&&st.ent[x].includes(id)&&!(st.rounds[x].ties&&st.rounds[x].ties.some(t=>t.a===id||t.b===id))):undefined;
+      if(er!=null&&er>st.r){let kk=c.k-l;for(let x=st.r;x<er;x++)kk+=st.rounds[x].legs;if(kk<c.dates.length)out.push({d:c.dates[kk],c,tbd:1,rn:st.rounds[er].n});continue}
       while(r<st.rounds.length&&k<c.dates.length){
         const rd=st.rounds[r];
         if(r===st.r&&rd.ties){const t=rd.ties.find(t=>t.a===id||t.b===id);if(t&&!t.bye)out.push({d:c.dates[k],c,h:l===0?t.a:t.b,a:l===0?t.b:t.a,leg:rd.legs>1?l+1:0,rn:rd.n,tie:t});else if(!t||t.bye){/* folga */}}
@@ -2447,6 +2477,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="14";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="15";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
