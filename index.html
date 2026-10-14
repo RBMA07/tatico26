@@ -366,6 +366,12 @@ label select{display:block;width:100%;margin-top:6px}
 #match .chipb.mchip.on{background:#35d07f;color:#07121c;border-color:#35d07f}
 #mfield .mslot{touch-action:none}
 #mfield .mslot.lift{z-index:6;transform:translate(-50%,-50%) scale(1.15)}
+#mfield .mslot{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.qs-wrap{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
+.qs{width:100%;max-width:560px;max-height:75vh;overflow:auto;background:#0f1e2c;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;color:#e8f0f7}
+.qs-h{display:flex;align-items:center;gap:10px}.qs-h>div{flex:1;display:flex;flex-direction:column}.qs-h small{color:#8ea4b8;font-size:12px}
+.qs .x{background:#0b1825;border:1px solid #1f3446;color:#8ea4b8;border-radius:50%;width:32px;height:32px}
+.qs em.rec{font-style:normal;font-size:11px;color:#35d07f;font-weight:700;margin-left:4px}
 
 </style>
 
@@ -2107,7 +2113,7 @@ function renderMatch(){
       <p class="tiny" style="color:var(--m-mute);font-weight:700">ESQUEMA</p>
       <div class="roles">${formsFor(m.on[me].length).map(f=>`<button class="chipb mchip ${MS.form===f?'on':''}" data-a="mform" data-v="${f}">${f}</button>`).join('')}</div>
       ${m.on[me].length<11?`<p class="tiny" style="color:#ff8a80">${m.on[me].length} em campo: escolha como o time se arruma (defensores-meias-atacantes).</p>`:''}
-      <p class="tiny" style="color:var(--m-mute)">Mudar posição: arraste o jogador para outro lugar do campo, ou toque nele e depois num círculo vazio. Solte (ou toque) em cima de outro jogador para os dois trocarem de posição. Trocar: toque em quem sai e em quem entra${selRole?` (força como ${selRole})`:''}; repita para montar várias trocas e confirme tudo de uma vez.</p>
+      <p class="tiny" style="color:var(--m-mute)">Substituição rápida: segure o jogador por meio segundo. Mudar posição: arraste o jogador para outro lugar do campo, ou toque nele e depois num círculo vazio. Solte (ou toque) em cima de outro jogador para os dois trocarem de posição. Trocar: toque em quem sai e em quem entra${selRole?` (força como ${selRole})`:''}; repita para montar várias trocas e confirme tudo de uma vez.</p>
       ${fld}
       <p class="tiny" style="color:var(--m-mute);font-weight:700">BANCO</p>
       <div class="benchrow">${b.map(itB).join('')||'<span class="tiny" style="color:var(--m-mute)">Banco vazio</span>'}</div>
@@ -2130,6 +2136,13 @@ function renderMatch(){
      <button class="btn ${MS.speed>1?'on':''}" data-a="mspeed" aria-label="Velocidade">${MS.speed}×</button>
      <button class="btn" data-a="mskip">Fim ⏭</button></div>
      ${MS.paused?'':`<div class="seg">${Object.entries(TAC).map(([k,v])=>`<button class="${m.tac[me]===k?'on':''}" data-a="mtac" data-v="${k}">${v.n}</button>`).join('')}</div>`}`;
+  let qsHTML='';
+  if(MS.qs&&!MS.done&&MS.paused){const o=MS.qs.out;const e=m.on[me].find(x=>x[1]===o);
+    if(e){const r=e[0];const rel=MS.rel||[];const pIn=new Set((MS.pend||[]).map(x=>x.i));
+      const list=bench(m,me).filter(p=>!pIn.has(p.id)&&(MS.qs.all||!rel.length||rel.includes(p.id))).sort((x,y)=>((penP(y,r)<=1)-(penP(x,r)<=1))||eff(y,r)-eff(x,r));
+      qsHTML=`<div class="qs-wrap" data-a="qsclose"><div class="qs"><div class="qs-h"><div><b>Substituir ${esc(P(o).n)}</b><small>${RN[r]} · força ${P(o).o} · trocas ${m.subs[me]}/5</small></div><button class="x" data-a="qsclose" aria-label="Fechar">✕</button></div>
+        ${m.subs[me]>=5?'<p class="tiny" style="color:#ff8a80">Limite de 5 trocas atingido.</p>':list.map((p,k)=>{const pn=penP(p,r);return `<button class="it pk" data-a="qsin" data-v="${p.id}">${rpill(p.p)}<span>${esc(p.n)}${k===0&&pn<=1?' <em class="rec">recomendado</em>':''}</span><b class="${pn>1?'dn':''}">${eff(p,r)}</b></button>`}).join('')||'<p class="tiny">Banco vazio.</p>'}
+        ${MS.qs.all||m.subs[me]>=5?'':`<button class="btn sm" data-a="qsall" style="background:none;color:var(--m-mute);border-color:#1f3446">Ver todos do elenco</button>`}</div></div>`}}
   let endCard='';
   if(MS.done){
     const ga=groupAfter(c,MS.ms);
@@ -2152,7 +2165,7 @@ function renderMatch(){
     ${endCard}
     <div class="mcard"><h3>Lances</h3><div class="tl">${evs.length?evs.map(e=>`<div><span class="mn">${e.min}'</span><span>${ICON[e.k]}</span><span class="${e.k==='gol'||e.k==='pg'?'g':''}">${esc(e.n)} <span class="side">${esc(T(e.t).code)}</span></span></div>`).join(''):`<div><span></span><span></span><span style="color:var(--m-mute)">A bola vai rolar…</span></div>`}</div></div>
     ${others?`<div class="mcard"><h3>Outros jogos · ${esc(c.s)}</h3><div class="og">${others}</div></div>`:''}
-  </div>`;
+  </div>${qsHTML}`;
   {const _nw=$('#match .wrap');if(_nw&&_st)_nw.scrollTop=_st}
 }
 
@@ -2220,6 +2233,11 @@ const ACT={
   },
   allb:()=>{UI.allb=true;render()},
   mallb:()=>{MS.allb=true;renderMatch()},
+  qsin:v=>{const m=MS.mine;const o=MS.qs&&MS.qs.out;MS.qs=null;if(!o)return;if(m.subs[S.me]>=5){toast('Limite de 5 trocas atingido.');renderMatch();return}
+    if(!m.on[S.me].some(x=>x[1]===o)){renderMatch();return}
+    MS.pend=(MS.pend||[]).filter(x=>x.o!==o&&x.i!==+v);doSub(m,S.me,o,+v);toast(`Entra ${P(+v).n}, sai ${P(o).n}.`);renderMatch()},
+  qsall:()=>{MS.qs.all=true;renderMatch()},
+  qsclose:(v,el,e)=>{if(e&&e.target!==el&&!el.classList.contains('x'))return;MS.qs=null;renderMatch()},
   kick:()=>{UI.pre=false;UI.allb=false;startRound()},
   kickq:()=>{UI.pre=false;UI.allb=false;quickMine()},
   quick:()=>quickMine(),
@@ -2373,18 +2391,21 @@ let MD=null,NOMC=0;
 document.addEventListener('pointerdown',e=>{
   const el=e.target.closest('[data-mdrag]');const f=document.getElementById('mfield');if(!el||!f||!MS||e.button>0)return;
   MD={el,id:+el.dataset.mdrag,sx:e.clientX,sy:e.clientY,moved:false,rect:f.getBoundingClientRect()};
+  /* segurar ~0,45 s: abre a lista de reservas para substituição rápida */
+  const d=MD;d.timer=setTimeout(()=>{if(MD===d&&!d.moved){d.long=true;NOMC=Date.now()+700;MS.qs={out:d.id};MS.selOut=null;if(navigator.vibrate)try{navigator.vibrate(15)}catch(_){};renderMatch()}},450);
   try{el.setPointerCapture(e.pointerId)}catch(_){}
 });
 document.addEventListener('pointermove',e=>{
   if(!MD)return;
+  if(MD.long)return;
   if(!MD.moved&&Math.hypot(e.clientX-MD.sx,e.clientY-MD.sy)<8)return;
-  MD.moved=true;e.preventDefault();const r=MD.rect;
+  clearTimeout(MD.timer);MD.moved=true;e.preventDefault();const r=MD.rect;
   const x=clamp((e.clientX-r.left)/r.width*100,5,95),y=clamp((e.clientY-r.top)/r.height*100,5,95);
   MD.el.style.left=x+'%';MD.el.style.top=y+'%';MD.el.classList.add('lift');MD.x=x;MD.y=y;
   const b=MD.el.querySelector('b');if(b)b.textContent=zoneRole(snap(x,y).x,snap(x,y).y);
 },{passive:false});
 function endMDrag(e,cancel){
-  if(!MD)return;const d=MD;MD=null;if(!d.moved)return;
+  if(!MD)return;const d=MD;MD=null;clearTimeout(d.timer);if(d.long){NOMC=Date.now()+500;return}if(!d.moved)return;
   NOMC=Date.now()+450;
   if(cancel||!MS){renderMatch();return}
   const sn=snap(d.x,d.y);const m=MS.mine;
@@ -2401,6 +2422,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="9";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="10";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
