@@ -399,23 +399,35 @@ tr.tlink:active td{background:var(--accent-soft)}
 .pa-team{margin:0 0 10px;font-weight:700;font-size:.9rem;color:#4a5a66}
 .pa-goal{position:relative;height:150px;background:linear-gradient(#2f8f4e,#247a40);border-radius:10px;overflow:hidden}
 .pa-goal .net{position:absolute;left:15%;right:15%;top:14px;height:70px;border:4px solid #fff;border-bottom:none;background:repeating-linear-gradient(90deg,rgba(255,255,255,.18) 0 2px,transparent 2px 10px),repeating-linear-gradient(0deg,rgba(255,255,255,.18) 0 2px,transparent 2px 10px)}
-.pa-goal .keeper{position:absolute;left:50%;top:44px;width:22px;height:38px;margin-left:-11px;background:#f5c518;border-radius:8px 8px 4px 4px;transition:transform .45s cubic-bezier(.3,1.4,.6,1)}
-.pa-goal .ball{position:absolute;left:50%;bottom:12px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:#fff;box-shadow:inset -3px -3px 0 rgba(0,0,0,.18);transition:transform .45s cubic-bezier(.2,.7,.3,1)}
+.pa-goal .keeper{position:absolute;left:50%;top:30px;width:40px;height:56px;margin-left:-20px;transform-origin:50% 70%;transition:left .5s cubic-bezier(.25,.9,.4,1),transform .5s cubic-bezier(.25,.9,.4,1),top .5s}
+.pa-goal .keeper svg{width:100%;height:100%;display:block;overflow:visible}
+.pa:not(.go) .keeper{animation:paSway 1s ease-in-out infinite alternate}
+@keyframes paSway{from{transform:translateX(-4px)}to{transform:translateX(4px)}}
+.pa.go .keeper{left:var(--kl);top:var(--kt);transform:rotate(var(--kr))}
+.pa-goal .ball{position:absolute;left:50%;top:120px;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff 55%,#cfd6db);box-shadow:0 2px 3px rgba(0,0,0,.35);transition:left .45s cubic-bezier(.2,.7,.3,1),top .45s cubic-bezier(.2,.7,.3,1),transform .45s}
+.pa-goal .ball::after{content:'';position:absolute;inset:4px;border-radius:50%;background:#1d2a33;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%)}
 .pa:not(.go) .ball{animation:paBob .6s ease-in-out infinite alternate}
 @keyframes paBob{to{transform:translateY(-3px)}}
-.pa.go.g .ball{transform:translate(-62px,-104px) scale(.7)}
-.pa.go.g .keeper{transform:translateX(52px) rotate(25deg)}
-.pa.go.d .ball{transform:translate(-40px,-92px) scale(.72)}
-.pa.go.d .keeper{transform:translateX(-36px) rotate(-35deg)}
-.pa.go.t .ball{transform:translate(-90px,-112px) scale(.68)}
-.pa.go.t .keeper{transform:translateX(40px) rotate(20deg)}
-.pa.end.t .ball{transform:translate(-60px,-40px) scale(.8);transition-duration:.5s}
-.pa.go.f .ball{transform:translate(70px,-150px) scale(.55)}
-.pa.go.f .keeper{transform:translateX(-30px) rotate(-20deg)}
+.pa.go .ball{left:var(--bl);top:var(--bt);transform:scale(.72) rotate(540deg)}
+.pa.end .ball{left:var(--bl2);top:var(--bt2);transition-duration:.55s}
+.pa.end.g .net{animation:paNet .5s ease}
+@keyframes paNet{40%{transform:scaleY(1.06) translateY(-2px)}}
+.pa-goal .spot{position:absolute;left:50%;top:126px;width:6px;height:3px;margin-left:-3px;background:rgba(255,255,255,.8);border-radius:50%}
+.pa-goal .area{position:absolute;left:6%;right:6%;top:84px;height:30px;border:2px solid rgba(255,255,255,.5);border-top:none}
+.pa-goal .line{position:absolute;left:0;right:0;top:84px;height:2px;background:rgba(255,255,255,.7)}
 .pa-txt{margin:12px 0 0;font-size:1.4rem;font-weight:900;min-height:1.7em}
 .pa-txt.g{color:#12924a;font-size:2rem;animation:paPop .4s ease}
 .pa-txt.d,.pa-txt.t,.pa-txt.f{color:#d0342c;font-size:1.7rem;animation:paPop .4s ease}
 @keyframes paPop{0%{transform:scale(.4)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
+/* modo espectador */
+.spm{padding:9px 4px;border-bottom:1px solid var(--m-line)}.spm:last-child{border-bottom:none}
+.spr{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+.spr .h{display:flex;align-items:center;justify-content:flex-end;gap:6px;text-align:right;font-weight:700;font-size:.9rem}
+.spr .a{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.9rem}
+.spr .sc{font-size:1.35rem;font-variant-numeric:tabular-nums;min-width:58px;text-align:center}
+.spm.hot .sc{color:var(--m-acc);animation:paPop .4s ease}
+.sps{margin:4px 0 0;text-align:center;font-size:.75rem;color:var(--m-mute)}
+.mstat{margin:4px 0 0;font-size:1rem}
 
 </style>
 
@@ -1017,12 +1029,14 @@ function resolvePen(m,t,id){
   const ok=R()<penChance(m,t,p,r);
   const k=ok?'gol':(()=>{const x=R();return x<.55?'def':x<.72?'trave':'fora'})();
   if(MS&&MS.live&&m===MS.mine)penAnim(p.n,t,k,m.min);
-  if(ok){p.g++;if(t===m.h)m.gh++;else m.ga++;m.ev.push({min:m.min,t,k:'pg',n:`${p.n} (pênalti)`,id});return true}
-  m.ev.push({min:m.min,t,k:'pp',n:`${p.n} perde o pênalti: ${({def:'o goleiro defende',trave:'na trave',fora:'pra fora'})[k]}`});return false;
+  if(ok){p.g++;if(t===m.h)m.gh++;else m.ga++;m.ev.push({min:m.min,t,k:'pg',n:`${p.n} (pênalti)`,id})}
+  else m.ev.push({min:m.min,t,k:'pp',n:`${p.n} perde o pênalti: ${({def:'o goleiro defende',trave:'na trave',fora:'pra fora'})[k]}`});
+  if(MS&&MS.panim&&m===MS.mine)MS.panim.ev=m.ev[m.ev.length-1];
+  return ok;
 }
 /* sequência: se prepara → partiu → bateu → resultado; o relógio para durante a cobrança */
 function penAnim(n,t,k,min){
-  clearInterval(MS.timer);MS.panim={n,t,k,min,step:0};renderMatch();
+  clearInterval(MS.timer);MS.panim={n,t,k,min,step:0,g:penGeo(k)};renderMatch();
   const steps=[700,650,900,1500];let i=0;
   const nx=()=>{if(!MS||!MS.panim)return;i++;if(i<4){MS.panim.step=i;const w=document.querySelector('.pa-wrap');if(w){const t=document.createElement('div');t.innerHTML=penAnimHTML();const nw=t.firstElementChild;w.querySelector('.pa').className=nw.querySelector('.pa').className;w.querySelector('.pa-txt').outerHTML=nw.querySelector('.pa-txt').outerHTML}else renderMatch();setTimeout(nx,steps[i])}else{MS.panim=null;renderMatch();runClock()}};
   setTimeout(nx,steps[0]);
@@ -1119,10 +1133,13 @@ function matchPost(m,c){
   }
 }
 /* avança até a data do seu próximo jogo; devolve o jogo ou null se a temporada acabou */
-function advanceToMine(){
+/* competição em que você jogou nesta temporada, tem jogos hoje e você está fora (eliminado) */
+function spectComp(d){if(S.spect===false)return null;return compsOn(d).find(c=>c.st&&c.st.t==='ko'&&compTeams(c).includes(S.me)&&compFixtures(c).length&&!compFixtures(c).some(([h,a])=>h===S.me||a===S.me))||null}
+function advanceToMine(stopSpect){
   let guard=0;
   while(S.d<S.cal.length&&guard++<200){
     const f=myFixtureOn(S.d);if(f)return f;
+    if(stopSpect&&UI.spSkip!==S.d&&spectComp(S.d)){UI.spAt=S.d;return null}
     simDate();if(S.fired||UI.summary)return null;
   }
   return null;
@@ -1166,6 +1183,18 @@ function tick(){
 }
 function skipToEnd(){const m=MS.mine;MS.panim=null;MS.live=false;if(MS.pen){const id=bestTaker(m,S.me);if(id)resolvePen(m,S.me,id);MS.pen=null}MS.paused=false;MS.live=false;clearInterval(MS.timer);(m.gap[S.me]||[]).splice(0).forEach(r=>autoSub(m,S.me,r));while(m.min<m.end)stepMatch(m);finishLive()}
 function finishLive(){clearInterval(MS.timer);MS.done=true;MS.live=false;koDecider(MS.mine,MS.c);renderMatch()}
+/* ==================== MODO ESPECTADOR ==================== */
+const SPSP={1:300,2:150,4:70};
+function startSpect(){
+  const c=spectComp(S.d);if(!c)return;
+  const all=compsOn(S.d).map(cc=>[cc,compFixtures(cc).map(([h,a])=>{const m=quickMatch(h,a,cc);koDecider(m,cc);return m})]);
+  const rd=c.st.rounds[c.st.r];
+  WS={c,all,ms:all.find(x=>x[0]===c)[1],min:0,speed:S.mspeed||1,done:false,timer:null,label:`${c.s} · ${rd.n}${rd.legs>1?` · ${c.st.l===0?'ida':'volta'}`:''}`};
+  $('#match').hidden=false;renderSpect();runSpect();
+}
+function runSpect(){clearInterval(WS.timer);if(WS.done||WS.paused)return;WS.timer=setInterval(()=>{WS.min++;if(WS.min>=90){WS.min=90;WS.done=true;clearInterval(WS.timer)}renderSpect()},SPSP[WS.speed]||300)}
+function closeSpect(){clearInterval(WS.timer);const all=WS.all;WS=null;$('#match').hidden=true;$('#match').innerHTML='';postDate(all);save();UI.spAt=null;UI.tab='jogo';render()}
+let WS=null;
 function closeMatch(){
   const {all}=MS;MS=null;$('#match').hidden=true;$('#match').innerHTML='';
   postDate(all);
@@ -2004,6 +2033,7 @@ function crestTeams(){
 function renderOpcoes(){
   UI.crq=UI.crq||'';
   return `
+  <div class="card"><div class="card-h"><h3>Copas em que você caiu</h3><button class="btn sm ${S.spect===false?'':'on'}" data-a="spon">${S.spect===false?'Desligado':'Ligado'}</button></div><p class="small">Quando ligado, as rodadas das copas em que você foi eliminado param para você assistir (ou simular).</p></div>
   <div class="card"><h3>Calendário da temporada</h3>
     <p class="small">Janeiro a abril: estaduais aos domingos, copas regionais (Nordeste, Sul-Sudeste, Verde) e as primeiras fases da Copa do Brasil no meio de semana. De maio a dezembro: Séries A a D e as ligas sul-americanas, intercaladas com Libertadores, Sul-Americana e o mata-mata da Copa do Brasil.</p>
     <p class="small">Fim de temporada: 4 sobem e 4 caem entre A, B e C. Na Série C, os 8 primeiros fazem dois quadrangulares (os 2 de cada sobem). Na Série D, os semifinalistas sobem; quem não se reclassifica pelo estadual volta a ser distrital. Vagas continentais: 6 brasileiros na Libertadores (campeão da Copa do Brasil e os melhores da Série A) e os 6 seguintes na Sul-Americana; campeões continentais têm vaga garantida.</p></div>
@@ -2042,7 +2072,32 @@ function matchOdds(h,a,c){
   let w=0,d=0,l=0;for(let i=0;i<9;i++)for(let j=0;j<9;j++){const p=poisson(lh,i)*poisson(la,j);if(i>j)w+=p;else if(i===j)d+=p;else l+=p}
   const tot=w+d+l;return{w:w/tot,d:d/tot,l:l/tot,lh,la,sh,sa,pub:g.pub,occ:g.occ};
 }
+function spectCardHTML(){
+  const c=spectComp(S.d);if(!c)return '';const rd=c.st.rounds[c.st.r];
+  const fx=compFixtures(c);
+  return `<div class="card"><h3>${esc(c.s)} · ${esc(rd.n)}${rd.legs>1?` · ${c.st.l===0?'ida':'volta'}`:''}</h3>
+    <p class="small">${dLabel(S.cal[S.d])}. Seu time já está fora, mas a competição segue. ${fx.length} jogo${fx.length>1?'s':''} hoje:</p>
+    <div class="list">${fx.map(([h,a])=>`<div class="fx"><span class="h">${esc(T(h).name)} ${crest(h,22)}</span><span class="sc">×</span><span class="a">${crest(a,22)} ${esc(T(a).name)}</span></div>`).join('')}</div>
+    <button class="btn pri big" data-a="spwatch">▶ Assistir a rodada</button>
+    <div class="row" style="margin-top:8px"><button class="btn sm grow" data-a="spskip">Simular e seguir</button><button class="btn sm grow" data-a="spoff">Não mostrar mais</button></div></div>`;
+}
+function renderSpect(){
+  const w=WS;if(!w)return;const cur=w.done?999:w.min;
+  const tie=(m)=>{const st=w.c.st,rd=st.rounds[st.r];if(rd.legs<2||st.l!==rd.legs-1)return null;const t=rd.ties.find(t=>(t.a===m.h&&t.b===m.a)||(t.a===m.a&&t.b===m.h));return t?(t.a===m.h?[t.ga,t.gb]:[t.gb,t.ga]):null};
+  const rows=w.ms.map(m=>{const vis=m.ev.filter(e=>(e.k==='gol'||e.k==='pg')&&e.min<=cur);const gh=vis.filter(e=>e.t===m.h).length,ga=vis.filter(e=>e.t===m.a).length;
+    const hot=!w.done&&vis.some(e=>e.min>cur-4);const pv=tie(m);const agg=pv?`agr. ${pv[0]+gh}–${pv[1]+ga}`:'';
+    const pens=w.done&&m.pens?`pên. ${m.pens[0]}–${m.pens[1]}`:'';
+    const rd=w.c.st.rounds[w.c.st.r],dec=rd.legs<2||w.c.st.l===rd.legs-1;let adv='';
+    if(w.done&&dec){const A=pv?pv[0]+gh:gh,B=pv?pv[1]+ga:ga;const win=A!==B?(A>B?m.h:m.a):m.pens?(m.pens[0]>m.pens[1]?m.h:m.a):null;if(win)adv=`<b style="color:var(--m-acc)">${esc(T(win).name)} avança</b>`}
+    const sc=vis.filter(e=>!w.done?true:true).slice(-3).map(e=>`${e.min}' ${esc(e.n)}`).join(' · ');
+    const sub=[[agg,pens].filter(Boolean).join(' · '),adv,sc].filter(Boolean).join('<br>');return `<div class="spm ${hot?'hot':''}"><div class="spr"><span class="h">${esc(T(m.h).name)} ${crest(m.h,26)}</span><b class="sc">${gh} : ${ga}</b><span class="a">${crest(m.a,26)} ${esc(T(m.a).name)}</span></div>${sub?`<p class="sps">${sub}</p>`:''}</div>`}).join('');
+  const status=w.done?'FIM DOS JOGOS':`<b>● AO VIVO</b> · ${w.min}'`;
+  $('#match').innerHTML=`<div class="wrap"><div class="mcard" style="text-align:center"><p class="tiny" style="letter-spacing:.08em;font-weight:800;color:var(--m-mute)">${esc(w.label.toUpperCase())}</p><p class="mstat">${status}</p></div>
+    <div class="row" style="gap:8px">${w.done?`<button class="btn pri big grow" data-a="spclose">Continuar</button>`:`${[1,2,4].map(v=>`<button class="btn sm ${w.speed===v?'on':''}" data-a="spspeed" data-v="${v}">${v}×</button>`).join('')}<button class="btn sm grow" data-a="spend">Fim ⏭</button>`}</div>
+    <div class="mcard">${rows}</div></div>`;
+}
 function renderJogo(){
+  if(UI.spAt===S.d&&spectComp(S.d))return spectCardHTML();
   const nf=nextFixture();
   if(!nf)return `<div class="card"><h3>Temporada cumprida</h3><p class="small">Seu clube não tem mais jogos em ${S.season}. As outras competições seguem até dezembro.</p><button class="btn pri big" data-a="toend">Avançar até o fim da temporada</button></div>`;
   const gap=nf.d-S.d;
@@ -2240,14 +2295,49 @@ function openPlayer(pid){
 }
 
 /* ==================== ANIMAÇÃO DE PÊNALTI ==================== */
+function keeperSVG(kit){
+  return `<svg viewBox="0 0 40 56"><g stroke-linecap="round">
+    <line x1="13" y1="20" x2="4" y2="6" stroke="${kit}" stroke-width="5"/><line x1="27" y1="20" x2="36" y2="6" stroke="${kit}" stroke-width="5"/>
+    <circle cx="4" cy="5" r="3.4" fill="#f4f4f4" stroke="#333" stroke-width=".8"/><circle cx="36" cy="5" r="3.4" fill="#f4f4f4" stroke="#333" stroke-width=".8"/>
+    <line x1="16" y1="40" x2="12" y2="52" stroke="#c98d63" stroke-width="4.5"/><line x1="24" y1="40" x2="28" y2="52" stroke="#c98d63" stroke-width="4.5"/>
+    <line x1="12.6" y1="47" x2="11.6" y2="52" stroke="${kit}" stroke-width="5"/><line x1="27.4" y1="47" x2="28.4" y2="52" stroke="${kit}" stroke-width="5"/>
+    <ellipse cx="11" cy="54" rx="3.4" ry="1.8" fill="#111"/><ellipse cx="29" cy="54" rx="3.4" ry="1.8" fill="#111"/>
+    </g>
+    <rect x="11" y="16" width="18" height="18" rx="5" fill="${kit}"/>
+    <path d="M12 26h16" stroke="rgba(0,0,0,.18)" stroke-width="2"/>
+    <rect x="12" y="32" width="16" height="9" rx="2.5" fill="#1d2a33"/>
+    <rect x="18" y="13" width="4" height="4" fill="#c98d63"/>
+    <circle cx="20" cy="9" r="6" fill="#c98d63"/><path d="M14 8a6 6 0 0 1 12 0q-6-3-12 0z" fill="#2a1d14"/>
+  </svg>`;
+}
+const GKKITS=['#f5c518','#22c3b0','#ff7a1a','#8e44d6','#e8336d','#9be22d','#2b2f36'];
+function gkKit(tid){const t=T(tid);const near=c=>{const h=x=>parseInt(x.slice(1),16);const d=(p,q)=>Math.abs((h(p)>>16)-(h(q)>>16))+Math.abs((h(p)>>8&255)-(h(q)>>8&255))+Math.abs((h(p)&255)-(h(q)&255));return [t.c1,t.c2].some(x=>/^#[0-9a-f]{6}$/i.test(x||'')&&d(c,x)<140)};
+  let i=0;for(const ch of String(tid))i=(i*31+ch.charCodeAt(0))%997;for(let k=0;k<GKKITS.length;k++){const c=GKKITS[(i+k)%GKKITS.length];if(!near(c))return c}return GKKITS[0]}
+/* geometria da cobrança: canto, altura, mergulho do goleiro e rebote */
+function penGeo(k){
+  const rr=(a,b)=>a+Math.random()*(b-a),side=()=>Math.random()<.5?-1:1;
+  const s=Math.random()<.18?0:side(),high=Math.random()<.4;
+  let bx=s===0?rr(-4,4):s*rr(16,29),by=high?rr(24,36):rr(58,74);
+  let kd,bx2=null,by2=null;
+  if(k==='gol'){kd=s===0?side():(Math.random()<.7?-s:s);if(kd===s&&s!==0){bx=s*rr(28,32);by=high?rr(20,28):by}}
+  else if(k==='def'){kd=s;if(s===0){by=rr(40,60)}bx2=bx+(s||side())*rr(14,24);by2=by+rr(22,40)}
+  else if(k==='trave'){if(Math.random()<.3){bx=rr(-24,24);by=16;bx2=bx+rr(-10,10);by2=rr(100,120)}else{const p=side();bx=p*35;bx2=p*rr(20,30);by2=rr(98,118)}kd=Math.random()<.5?-Math.sign(bx||1):Math.sign(bx||1)}
+  else{if(Math.random()<.45){bx=rr(-28,28);by=-2}else{bx=side()*rr(44,48);}kd=side()}
+  if(bx2===null){bx2=bx;by2=by}
+  const kl=50+(kd===0?0:kd*(s===kd&&k==='def'?Math.min(Math.abs(bx),24):rr(16,24)));
+  const kt=s===0&&k==='def'?22:Math.max(8,Math.min(42,(k==='def'?by:(high?28:64))-26));
+  const kr=kd===0?0:kd*(high?62:82);
+  return {bl:50+bx,bt:by,bl2:50+bx2,bt2:by2,kl,kt,kr};
+}
 function penAnimHTML(){
   const a=MS&&MS.panim;if(!a)return '';
   const res={gol:['GOL!','g'],def:['DEFENDEU!','d'],trave:['NA TRAVE!','t'],fora:['PRA FORA!','f']}[a.k];
   const txt=a.step===0?`${esc(a.n)} se prepara…`:a.step===1?'Partiu…':a.step===2?'Bateu!':res[0];
-  const bg=bgOf(T(a.t));
-  return `<div class="pa-wrap"><div class="pa ${a.step>=2?'go '+res[1]:''} ${a.step>=3?'end':''}">
+  const bg=bgOf(T(a.t)),g=a.g;const gk=MS.mine.h===a.t?MS.mine.a:MS.mine.h;
+  const vars=`--bl:${g.bl}%;--bt:${g.bt}px;--bl2:${g.bl2}%;--bt2:${g.bt2}px;--kl:${g.kl}%;--kt:${g.kt}px;--kr:${g.kr}deg`;
+  return `<div class="pa-wrap"><div class="pa ${a.step>=2?'go '+res[1]:''} ${a.step>=3?'end':''}" style="${vars}">
     <p class="pa-team"><i class="tg" style="background:${bg};color:${fgOn(bg)}">${esc(T(a.t).code)}</i> Pênalti · ${a.min}'</p>
-    <div class="pa-goal"><div class="net"></div><div class="keeper"></div><div class="ball"></div></div>
+    <div class="pa-goal"><div class="line"></div><div class="area"></div><div class="spot"></div><div class="net"></div><div class="keeper">${keeperSVG(gkKit(gk))}</div><div class="ball"></div></div>
     <p class="pa-txt ${a.step>=3?res[1]:''}">${txt}</p></div></div>`;
 }
 
@@ -2294,7 +2384,9 @@ function groupAfter(c,ms){
 }
 function renderMatch(){
   const {mine:m,c}=MS;const me=S.me;const cur=MS.done?999:m.min;
-  const evs=m.ev.slice().reverse();
+  const hid=MS.panim&&MS.panim.step<3?MS.panim.ev:null;
+  const evs=m.ev.filter(e=>e!==hid).reverse();
+  const shH=m.gh-(hid&&hid.k==='pg'&&hid.t===m.h?1:0),shA=m.ga-(hid&&hid.k==='pg'&&hid.t===m.a?1:0);
   const others=MS.ms.filter(x=>x!==m).map(x=>{const vis=x.ev.filter(e=>(e.k==='gol'||e.k==='pg')&&e.min<=cur);const gh=vis.filter(e=>e.t===x.h).length,ga=vis.filter(e=>e.t===x.a).length;const hot=!MS.done&&vis.some(e=>e.min>cur-4);const tg=id=>{const t=T(id),bg=bgOf(t);return `<i class="tg" style="background:${bg};color:${fgOn(bg)};box-shadow:inset 0 0 0 2px ${t.c2}">${esc(t.code)}</i>`};return `<div class="${hot?'hot':''}"><span>${tg(x.h)} <b>${gh}</b></span><span><b>${ga}</b> ${tg(x.a)}</span></div>`}).join('');
   const status=MS.done?'FIM DE JOGO':MS.half&&MS.paused&&m.min===45?'INTERVALO':MS.paused?`PAUSADO · ${m.min}'`:`<b>● AO VIVO</b> · ${m.min}'`;
   const share=m.lH&&m.lA?m.lH/(m.lH+m.lA):.5;
@@ -2356,7 +2448,7 @@ function renderMatch(){
   $('#match').innerHTML=`<div class="wrap">
     <div class="board">
       <div class="st">${esc(label.toUpperCase())}</div><div class="st">${status}</div><div class="st" style="letter-spacing:.04em">Público: ${(m.pub||0).toLocaleString('pt-BR')} (${Math.round((m.occ||0)*100)}%)</div>
-      <div class="sb"><div class="tm">${crest(m.h,52)}<span>${esc(T(m.h).name)}</span>${m.down[m.h]?`<em class="red">🟥 ${11-m.down[m.h]} em campo</em>`:''}</div><span class="num">${m.gh}<i>:</i>${m.ga}</span><div class="tm">${crest(m.a,52)}<span>${esc(T(m.a).name)}</span>${m.down[m.a]?`<em class="red">🟥 ${11-m.down[m.a]} em campo</em>`:''}</div></div>
+      <div class="sb"><div class="tm">${crest(m.h,52)}<span>${esc(T(m.h).name)}</span>${m.down[m.h]?`<em class="red">🟥 ${11-m.down[m.h]} em campo</em>`:''}</div><span class="num">${shH}<i>:</i>${shA}</span><div class="tm">${crest(m.a,52)}<span>${esc(T(m.a).name)}</span>${m.down[m.a]?`<em class="red">🟥 ${11-m.down[m.a]} em campo</em>`:''}</div></div>
       ${MS.done&&m.pens?`<div class="st" style="letter-spacing:.04em">Pênaltis: ${m.pens[0]} x ${m.pens[1]}</div>`:''}
       <div class="prog"><i style="width:${clamp(m.min/90*100,0,100)}%"></i></div>
       <div class="press"><span>${esc(T(m.h).code)}</span><div class="b"><i style="width:${share*100}%;background:${light(bgOf(T(m.h)))?'#cfd8de':bgOf(T(m.h))}"></i><i style="flex:1;background:${light(bgOf(T(m.a)))?'#cfd8de':bgOf(T(m.a))}"></i></div><span>${esc(T(m.a).code)}</span></div>
@@ -2430,8 +2522,8 @@ const ACT={
   continue:()=>{try{useState(loadSaved());render()}catch(e){toast('Save corrompido. Comece um novo jogo.')}},
   play:()=>{
     if(fixMyXI())toast('Escalação ajustada: havia desfalques.');
-    const f=advanceToMine();save();
-    if(!f){render();return}
+    const f=advanceToMine(true);save();
+    if(!f){if(UI.spAt===S.d)UI.tab='jogo';render();return}
     fixMyXI();UI.pre=true;UI.tab='elenco';render();$('#main').scrollTop=0;
   },
   allb:()=>{UI.allb=true;render()},
@@ -2528,7 +2620,14 @@ const ACT={
   sin:v=>{v=+v;MS.selIn=MS.selIn===v?null:v;tryPair();renderMatch()},
   unpend:v=>{MS.pend=(MS.pend||[]).filter((x,k)=>k!==+v);renderMatch()},
   dosub:()=>{applyPend();renderMatch()},
-  mclose:()=>closeMatch()
+  mclose:()=>closeMatch(),
+  spwatch:()=>startSpect(),
+  spskip:()=>{UI.spSkip=S.d;UI.spAt=null;ACT.play()},
+  spoff:()=>{S.spect=false;UI.spAt=null;save();toast('Ok: jogos de copas em que você caiu serão simulados direto. Dá pra reativar em Opções.');ACT.play()},
+  spspeed:v=>{WS.speed=+v;S.mspeed=+v;runSpect();renderSpect()},
+  spend:()=>{WS.min=90;WS.done=true;clearInterval(WS.timer);renderSpect()},
+  spclose:()=>closeSpect(),
+  spon:()=>{S.spect=S.spect===false?true:false;save();render()}
 };
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-a]');if(!el||el.disabled)return;
@@ -2643,6 +2742,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="19";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="20";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
