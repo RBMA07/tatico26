@@ -454,6 +454,17 @@ tr.tlink:active td{background:var(--accent-soft)}
 .mfr>span{width:96px;font-size:.85rem;font-weight:700;color:var(--mute)}
 .mfr input{width:74px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--surface);color:inherit}
 .mfr i{font-style:normal;color:var(--mute);font-size:.85rem}
+/* disputa de pênaltis */
+.so{width:min(340px,90vw);background:#fff;color:#14212b;border-radius:18px;padding:14px;box-shadow:0 10px 40px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:10px}
+.so .pa{width:auto;box-shadow:none;padding:0;background:transparent}
+.so-h{margin:0;text-align:center;font-weight:900;letter-spacing:.1em;font-size:.8rem;color:#4a5a66}
+.so-board{display:flex;flex-direction:column;gap:6px}
+.so-row{display:flex;align-items:center;gap:8px}
+.so-row b{margin-left:auto;font-size:1.3rem;font-variant-numeric:tabular-nums}
+.so-dots{display:flex;gap:4px;flex-wrap:wrap}
+.so-dots i{font-style:normal;width:18px;text-align:center;color:#b6c0c8;font-size:1rem}
+.so-dots i.ok{color:#12924a}.so-dots i.no{color:#d0342c;font-weight:900}
+.so-skip{align-self:center;background:#eef2f4!important;color:#14212b!important;border-color:#dbe2e6!important}
 
 </style>
 
@@ -1208,7 +1219,43 @@ function tick(){
   renderMatch();
 }
 function skipToEnd(){const m=MS.mine;MS.panim=null;MS.live=false;if(MS.pen){const id=bestTaker(m,S.me);if(id)resolvePen(m,S.me,id);MS.pen=null}MS.paused=false;MS.live=false;clearInterval(MS.timer);(m.gap[S.me]||[]).splice(0).forEach(r=>autoSub(m,S.me,r));while(m.min<m.end)stepMatch(m);finishLive()}
-function finishLive(){clearInterval(MS.timer);MS.done=true;MS.live=false;koDecider(MS.mine,MS.c);renderMatch()}
+function finishLive(){clearInterval(MS.timer);MS.live=false;const m=MS.mine;koDecider(m,MS.c);
+  if(m.pens){const so=shootSeq(m);m.pens=so.res;MS.so={seq:so.seq,i:-1,sc:[0,0]};MS.done=false;MS.paused=true;renderMatch();soNext();return}
+  MS.done=true;renderMatch()}
+/* ==================== DISPUTA DE PÊNALTIS ==================== */
+/* cobrança a cobrança: 5 para cada lado (encerra antes se não der mais para alcançar) e depois alternadas */
+function shootSeq(m){
+  const ph=clamp(.5+(teamAvg(m.h)-teamAvg(m.a))*.012,.3,.7);
+  const order=t=>{const on=m.on[t].filter(x=>P(x[1]));const c=on.map(([r,id])=>({id,r,c:penChance(m,t,P(id),r)})).sort((a,b)=>(a.r==='GOL')-(b.r==='GOL')||b.c-a.c);return c.length?c:[{id:null,r:'CA',c:.7}]};
+  const L={[m.h]:order(m.h),[m.a]:order(m.a)},cnt={[m.h]:0,[m.a]:0},sc={[m.h]:0,[m.a]:0},seq=[];
+  const kick=t=>{const l=L[t];const x=l[cnt[t]++%l.length];const adj=(t===m.h?ph-.5:.5-ph)*.25;const ok=R()<clamp(.75+(x.c-.75)*.25+adj*.3,.58,.86);
+    const k=ok?'gol':(()=>{const y=R();return y<.55?'def':y<.72?'trave':'fora'})();if(ok)sc[t]++;seq.push({t,id:x.id,n:x.id?P(x.id).n:'Cobrador',k})};
+  for(let r=0;r<5;r++){
+    kick(m.h);if(sc[m.h]>sc[m.a]+(5-r)||sc[m.a]>sc[m.h]+(4-r))break;
+    kick(m.a);if(sc[m.h]>sc[m.a]+(4-r)||sc[m.a]>sc[m.h]+(4-r))break;
+  }
+  let g=0;while(sc[m.h]===sc[m.a]&&g++<30){kick(m.h);kick(m.a)}
+  if(sc[m.h]===sc[m.a])sc[m.h]++;
+  return {seq,res:[sc[m.h],sc[m.a]]};
+}
+const SOSTEP=[650,550,1100];
+function soNext(){
+  const so=MS&&MS.so;if(!so)return;
+  so.i++;
+  if(so.i>=so.seq.length){setTimeout(()=>{if(!MS||!MS.so)return;MS.so=null;MS.done=true;renderMatch()},1300);soPaint(true);return}
+  const k=so.seq[so.i];so.step=0;so.g=penGeo(k.k);soPaint();
+  setTimeout(()=>{if(!MS||MS.so!==so)return;so.step=1;soPaint()},SOSTEP[0]);
+  setTimeout(()=>{if(!MS||MS.so!==so)return;so.step=2;if(k.k==='gol')so.sc[k.t===MS.mine.h?0:1]++;soPaint();setTimeout(soNext,SOSTEP[2])},SOSTEP[0]+SOSTEP[1]);
+}
+function soSkip(){const so=MS&&MS.so;if(!so)return;MS.so=null;MS.done=true;renderMatch()}
+/* atualiza só a cobrança (para as transições de bola e goleiro funcionarem) */
+function soPaint(end){
+  const w=document.querySelector('.so-wrap');if(!w){renderMatch();return}
+  const tmp=document.createElement('div');tmp.innerHTML=soHTML(end);const nw=tmp.firstElementChild;
+  w.querySelector('.so-board').outerHTML=nw.querySelector('.so-board').outerHTML;
+  const pa=w.querySelector('.pa'),npa=nw.querySelector('.pa');
+  if(MS.so&&MS.so.step===0||end){pa.outerHTML=npa.outerHTML}else{pa.className=npa.className;pa.querySelector('.pa-txt').outerHTML=npa.querySelector('.pa-txt').outerHTML;pa.querySelector('.pa-team').outerHTML=npa.querySelector('.pa-team').outerHTML}
+}
 /* ==================== MODO ESPECTADOR ==================== */
 const SPSP={1:300,2:150,4:70};
 function startSpect(){
@@ -2451,6 +2498,24 @@ function penGeo(k){
   const kr=kd===0?0:kd*(high?62:82);
   return {bl:50+bx,bt:by,bl2:50+bx2,bt2:by2,kl,kt,kr};
 }
+function soHTML(end){
+  const so=MS&&MS.so;if(!so)return '';const m=MS.mine;
+  const RES={gol:['GOL!','g'],def:['DEFENDEU!','d'],trave:['NA TRAVE!','t'],fora:['PRA FORA!','f']};
+  const row=(t,ix)=>{const ks=so.seq.map((k,j)=>[k,j]).filter(([k])=>k.t===t);const done=ks.filter(([k,j])=>j<so.i||(j===so.i&&so.step>=2));
+    const n=Math.max(5,ks.length);const dots=Array.from({length:n},(_,q)=>{const d=done[q];return d?`<i class="${d[0].k==='gol'?'ok':'no'}">${d[0].k==='gol'?'●':'✕'}</i>`:'<i>○</i>'}).join('');
+    const bg=bgOf(T(t));return `<div class="so-row"><i class="tg" style="background:${bg};color:${fgOn(bg)}">${esc(T(t).code)}</i><span class="so-dots">${dots}</span><b>${so.sc[ix]}</b></div>`};
+  const k=so.seq[Math.min(so.i,so.seq.length-1)]||so.seq[0];const g=so.g||penGeo('gol');
+  const vars=`--bl:${g.bl}%;--bt:${g.bt}px;--bl2:${g.bl2}%;--bt2:${g.bt2}px;--kl:${g.kl}%;--kt:${g.kt}px;--kr:${g.kr}deg`;
+  const res=RES[k.k];const gk=k.t===m.h?m.a:m.h;const bg=bgOf(T(k.t));
+  const win=so.sc[0]>so.sc[1]?m.h:m.a;
+  const txt=end?`${esc(T(win).name)} vence!`:so.step===0?`${esc(k.n)} na bola…`:so.step===1?'Bateu!':res[0];
+  return `<div class="pa-wrap so-wrap"><div class="so"><p class="so-h">DISPUTA DE PÊNALTIS</p><div class="so-board">${row(m.h,0)}${row(m.a,1)}</div>
+    <div class="pa ${!end&&so.step>=1?'go '+res[1]:''} ${!end&&so.step>=2?'end':''}" style="${vars}">
+    <p class="pa-team"><i class="tg" style="background:${bg};color:${fgOn(bg)}">${esc(T(k.t).code)}</i> ${esc(k.n)}</p>
+    <div class="pa-goal"><div class="line"></div><div class="area"></div><div class="spot"></div><div class="net"></div><div class="keeper">${keeperSVG(gkKit(gk))}</div><div class="ball"></div></div>
+    <p class="pa-txt ${end?'g':so.step>=2?res[1]:''}">${txt}</p></div>
+    ${end?'':'<button class="btn sm so-skip" data-a="soskip">Pular disputa ⏭</button>'}</div></div>`;
+}
 function penAnimHTML(){
   const a=MS&&MS.panim;if(!a)return '';
   const res={gol:['GOL!','g'],def:['DEFENDEU!','d'],trave:['NA TRAVE!','t'],fora:['PRA FORA!','f']}[a.k];
@@ -2581,7 +2646,7 @@ function renderMatch(){
     <div class="mcard"><h3>Lances</h3><div class="tl">${evs.length?evs.map(e=>`<div><span class="mn">${e.min}'</span><span>${ICON[e.k]}</span><span class="${e.k==='gol'||e.k==='pg'?'g':''}">${esc(e.n)} <span class="side">${esc(T(e.t).code)}</span></span></div>`).join(''):`<div><span></span><span></span><span style="color:var(--m-mute)">A bola vai rolar…</span></div>`}</div>
 </div>
     ${others?`<div class="mcard"><h3>Outros jogos · ${esc(c.s)}</h3><div class="og">${others}</div></div>`:''}
-  </div>${qsHTML}${penAnimHTML()}`;
+  </div>${qsHTML}${penAnimHTML()}${soHTML()}`;
   {const _nw=$('#match .wrap');if(_nw&&_st)_nw.scrollTop=_st}
 }
 
@@ -2749,6 +2814,7 @@ const ACT={
   unpend:v=>{MS.pend=(MS.pend||[]).filter((x,k)=>k!==+v);renderMatch()},
   dosub:()=>{applyPend();renderMatch()},
   mclose:()=>closeMatch(),
+  soskip:()=>soSkip(),
   spwatch:()=>startSpect(),
   spskip:()=>{UI.spSkip=S.d;UI.spAt=null;ACT.play()},
   spoff:()=>{S.spect=false;UI.spAt=null;save();toast('Ok: jogos de copas em que você caiu serão simulados direto. Dá pra reativar em Opções.');ACT.play()},
@@ -2872,6 +2938,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="25";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="26";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
