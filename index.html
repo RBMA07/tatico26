@@ -428,6 +428,20 @@ tr.tlink:active td{background:var(--accent-soft)}
 .spm.hot .sc{color:var(--m-acc);animation:paPop .4s ease}
 .sps{margin:4px 0 0;text-align:center;font-size:.75rem;color:var(--m-mute)}
 .mstat{margin:4px 0 0;font-size:1rem}
+/* tabelas finais das séries */
+.sumseg{margin:6px 0 8px}
+.sumleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.75rem;margin-bottom:6px}
+.sumrows{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.sumh,.sumr{display:grid;grid-template-columns:26px 1fr 34px 30px 36px;align-items:center;gap:4px;padding:5px 8px;font-size:.82rem}
+.sumh{font-size:.7rem;color:var(--mute);font-weight:700;background:var(--surface2)}
+.sumh span:nth-child(n+3),.sumr span:nth-child(n+3){text-align:right}
+.sumr{border-top:1px solid var(--line)}
+.sumr .tm{display:flex;align-items:center;gap:6px;min-width:0}.sumr .tm b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.sumr .tm i{font-style:normal;font-size:.7rem}
+.sumr.zu{box-shadow:inset 3px 0 0 var(--win);background:color-mix(in srgb,var(--win) 8%,transparent)}
+.sumr.zd{box-shadow:inset 3px 0 0 var(--loss);background:color-mix(in srgb,var(--loss) 8%,transparent)}
+.sumr.me b{color:var(--accent)}
+.sumgap{text-align:center;color:var(--mute);font-size:.8rem;border-top:1px solid var(--line)}
 
 </style>
 
@@ -1611,6 +1625,11 @@ function contGroups(ids){
   }
   return best;
 }
+/* tabela final de uma série: posição pelo ranking, números da fase de pontos corridos */
+function finalTable(c,rk){
+  const perf={};c.done.concat(c.st&&!c.fin?[c.st]:[]).filter(s=>s.t==='rr').forEach(s=>s.groups.forEach(g=>groupTable(g).forEach(r=>{if(!perf[r.id])perf[r.id]=r})));
+  return rk.map(id=>{const r=perf[id]||{};return [id,r.P||0,r.J||0,(r.GP||0)-(r.GC||0)]});
+}
 function seasonEnd(){
   const Rk={};Object.values(S.comps).forEach(c=>Rk[c.id]=compRanking(c));
   const me=T(S.me);const main=S.comps[me.main];
@@ -1651,7 +1670,7 @@ function seasonEnd(){
   const growth=squad(S.me).map(p=>({n:p.n,d:p.o-p.o0})).sort((a,b)=>b.d-a.d);
   const moved=A1.includes(S.me)&&me.div==='B'?'Acesso à Série A!':B1.includes(S.me)&&me.div==='A'?'Rebaixado para a Série B.':B1.includes(S.me)&&me.div==='C'?'Acesso à Série B!':C1.includes(S.me)&&me.div==='B'?'Rebaixado para a Série C.':C1.includes(S.me)&&me.div==='D'?'Acesso à Série C!':D1.includes(S.me)&&me.div==='C'?'Rebaixado para a Série D.':D1.includes(S.me)&&me.div==='E'?'Classificado para a Série D!':me.div==='D'&&!D1.includes(S.me)&&!C1.includes(S.me)?`Sem vaga na Série D de ${S.season+1}: as vagas vêm do estadual${me.reg&&Rk['E-'+me.reg]&&Rk['E-'+me.reg].includes(S.me)?` e o clube terminou em ${Rk['E-'+me.reg].indexOf(S.me)+1}º no ${STN[me.reg]}`:''}. Volta a ser distrital.`:'';
   S.hist.push({season:S.season,club:S.me,div:me.div,comp:main?main.s:'—',pos,titles:myTitles.map(t=>t.n)});
-  UI.summary={season:S.season,champs:['A','B','C','D','CB','LIB','SUD'].map(k=>[k,S.comps[k]&&S.comps[k].champ]).filter(x=>x[1]),pos,comp:main?main.s:'',tg,titles:myTitles.map(t=>t.n),art:art?`${art.n} (${art.g} gols)`:'-',best:growth.slice(0,3).filter(x=>x.d>0),moved,lib:LIB1.includes(S.me),sud:SUD1.includes(S.me)};
+  UI.summary={season:S.season,champs:['A','B','C','D','CB','LIB','SUD'].map(k=>[k,S.comps[k]&&S.comps[k].champ]).filter(x=>x[1]),pos,comp:main?main.s:'',tg,titles:myTitles.map(t=>t.n),art:art?`${art.n} (${art.g} gols)`:'-',best:growth.slice(0,3).filter(x=>x.d>0),moved,lib:LIB1.includes(S.me),sud:SUD1.includes(S.me),tabs:Object.fromEntries(['A','B','C','D'].filter(k=>S.comps[k]).map(k=>[k,finalTable(S.comps[k],Rk[k])]))};S.lastTabs={season:S.season,tabs:UI.summary.tabs};
   S.sat=clamp(S.sat,0,100);
   const ST1=JSON.parse(JSON.stringify(S.P.ST));const nat=new Set([...A1,...B1,...C1,...D1]);const listed=new Set(Object.values(ST1).flat());
   Object.values(S.teams).forEach(t=>{if(STN[t.reg]&&!nat.has(t.id)&&!listed.has(t.id)&&ST1[t.reg]){ST1[t.reg].push(t.id);if(t.id===S.me)news(`Fora das séries nacionais, o ${t.name} passa a disputar o ${STN[t.reg]}.`)}});
@@ -1813,12 +1832,29 @@ function render(){
     ${s.moved?`<p class="${/Acesso|Classificado/.test(s.moved)?'up':'dn'}" style="font-weight:700">${esc(s.moved)}</p>`:''}
     <div class="stats"><div class="stat"><small>${esc(s.comp||'Liga')}</small><b>${s.pos}º</b></div><div class="stat"><small>Meta</small><b>${s.tg?'até '+s.tg+'º':'—'}</b></div><div class="stat"><small>Diretoria</small><b>${Math.round(S.sat)}%</b></div></div>
     ${s.lib?'<p class="small up" style="font-weight:600">Vaga na Libertadores do ano que vem!</p>':s.sud?'<p class="small" style="font-weight:600">Vaga na Sul-Americana do ano que vem.</p>':''}
+    ${s.tabs?seriesTablesHTML(s.tabs):''}
     <p class="tiny mute" style="font-weight:700">CAMPEÕES</p>
     <div class="list">${s.champs.map(([k,id])=>`<div class="kv small"><span>${esc(compMeta(k).s)}</span><span class="tm" style="display:flex;gap:6px;align-items:center">${crest(id,20)}<b>${esc(tname(id))}</b></span></div>`).join('')}</div>
     <p class="small">Artilheiro entre os clubes da Série A (todas as competições): <b>${esc(s.art)}</b></p>
     ${s.best.length?`<p class="small">Quem mais evoluiu no seu elenco: ${s.best.map(b=>`<b>${esc(b.n)}</b> <span class="up">+${b.d}</span>`).join(', ')}</p>`:''}
     <p class="hint">Todos ganharam um ano. Quem tem 30+ teve o potencial fixado na força atual, alguns veteranos se aposentaram e as bases revelaram garotos. Acessos, rebaixamentos e vagas nas copas já valem para ${S.season}.</p>
     <button class="btn pri big" data-a="close">Começar ${S.season}</button>`)}
+}
+/* as 4 séries no fim do ano: quem sobe (verde) e quem desce (vermelho) */
+function seriesTablesHTML(tabs){
+  const ks=Object.keys(tabs);const myK=ks.find(k=>tabs[k].some(r=>r[0]===S.me))||ks[0];
+  const tbl=k=>{const rows=tabs[k];const n=rows.length;
+    const up=i=>k!=='A'&&i<4,down=i=>k!=='D'&&i>=16&&i<20,lim=k==="D"?12:n;
+    const myI=rows.findIndex(r=>r[0]===S.me);
+    const show=rows.map((r,i)=>[r,i]).filter(([r,i])=>i<lim||i===myI);
+    return `<div class="sumt" data-k="${k}" ${k===myK?'':'hidden'}>
+      <div class="sumleg"><span class="up">▲ ${k==='A'?'Campeão':'Sobem para a Série '+String.fromCharCode(k.charCodeAt(0)-1)}</span>${k!=='D'?`<span class="dn">▼ Descem para a Série ${String.fromCharCode(k.charCodeAt(0)+1)}</span>`:'<span class="mute">Os demais voltam a disputar vaga pelo estadual</span>'}</div>${rows.some((r,i)=>i&&i<lim&&r[1]>rows[i-1][1])?'<p class="tiny mute" style="margin:0 0 6px">Ordem final definida pelas fases finais · P, J e SG da 1ª fase.</p>':''}
+      <div class="sumrows"><div class="sumh"><span>#</span><span>Clube</span><span>P</span><span>J</span><span>SG</span></div>
+      ${show.map(([r,i],j)=>`${k==='D'&&i===myI&&i>=lim?'<div class="sumgap">…</div>':''}<div class="sumr ${up(i)||(k==='A'&&i===0)?'zu':''} ${down(i)?'zd':''} ${r[0]===S.me?'me':''}"><span>${i+1}</span><span class="tm">${crest(r[0],18)}<b>${esc(T(r[0]).name)}</b>${up(i)?'<i class="up">▲</i>':down(i)?'<i class="dn">▼</i>':''}</span><span><b>${r[1]}</b></span><span>${r[2]}</span><span>${r[3]>0?'+':''}${r[3]}</span></div>`).join('')}
+      ${k==='D'&&n>lim?`<p class="tiny mute" style="text-align:center;margin:6px 0 0">+ ${n-lim} clubes</p>`:''}</div></div>`};
+  return `<p class="tiny mute" style="font-weight:700">TABELAS FINAIS</p>
+    <div class="seg sumseg">${ks.map(k=>`<button class="${k===myK?'on':''}" data-a="sumtab" data-v="${k}">Série ${k}</button>`).join('')}</div>
+    ${ks.map(tbl).join('')}`;
 }
 function teamPower(id){const s=(SQ.get(id)||[]).map(p=>p.o).sort((a,b)=>b-a).slice(0,14);return s.length?s.reduce((a,b)=>a+b,0)/s.length:0}
 function renderStart(){
@@ -1881,7 +1917,7 @@ function renderClube(){
   ${boardCard(true)}
   ${auctionsCard()}
   <div class="card"><h3>Notícias</h3><div class="news">${S.news.slice(0,14).map(n=>`<div>${n.r?`<span class="r">${n.r}</span>`:''}${esc(n.s)}</div>`).join('')}</div></div>
-  ${S.hist.length||S.titles.length?`<div class="card"><h3>Histórico</h3>${S.hist.slice().reverse().map(h=>`<div class="kv"><span>${h.season} · ${esc(tname(h.club))} · ${esc(h.comp)}${h.titles.length?` · 🏆 ${h.titles.map(esc).join(', ')}`:''}</span><b>${h.pos}º</b></div>`).join('')}</div>`:''}`;
+  ${S.hist.length||S.titles.length?`<div class="card"><div class="card-h"><h3>Histórico</h3>${S.lastTabs?`<button class="btn sm" data-a="lasttabs">Séries ${S.lastTabs.season}</button>`:''}</div>${S.hist.slice().reverse().map(h=>`<div class="kv"><span>${h.season} · ${esc(tname(h.club))} · ${esc(h.comp)}${h.titles.length?` · 🏆 ${h.titles.map(esc).join(', ')}`:''}</span><b>${h.pos}º</b></div>`).join('')}</div>`:''}`;
 }
 function playerRow(p,market){
   const flags=(p.inj?`<span class="flag inj">Lesão ${p.inj}d</span>`:'')+(p.sus?`<span class="flag inj">Suspenso</span>`:'')+(p.sale?`<span class="flag sal">Leilão</span>`:'')+(p.t&&p.ct===1?`<span class="flag sal">Último ano</span>`:'');
@@ -2559,6 +2595,8 @@ const ACT={
   pl:v=>openPlayer(+v),
   team:v=>openTeam(v),
   close:()=>{closeSheet();if(S&&S.fired)render()},
+  sumtab:v=>{document.querySelectorAll('.sumt').forEach(e=>e.hidden=e.dataset.k!==v);document.querySelectorAll('.sumseg button').forEach(b=>b.classList.toggle('on',b.dataset.v===v))},
+  lasttabs:()=>{const l=S.lastTabs;if(!l)return;openSheet(`Séries · ${l.season}`,seriesTablesHTML(l.tabs))},
   bg:(v,el,e)=>{if(Date.now()<NOBG)return;if(e.target===el){closeSheet();if(S&&S.fired)render()}},
   aucgo:v=>{const min=parseFloat(($('#auc').value||'').replace(',','.'));if(!(min>0))return toast('Informe um preço mínimo válido.');if(openAuction(+v,min)===false)return;save();render();openPlayer(+v);toast(inWindow()?'Leilão aberto: os lances chegam a cada data.':'Leilão criado: começa quando a janela abrir.')},
   aucacc:v=>acceptAuction(+v),
@@ -2742,6 +2780,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="20";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="21";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
