@@ -677,6 +677,11 @@ input,select,textarea{background:#fff!important;color:#000!important;border:2px 
 .pstat>div{background:#fff;border:2px solid;border-color:#808080 #fff #fff #808080;border-radius:0}
 .gcard{background:#fff;border-radius:0;border:2px solid;border-color:#808080 #fff #fff #808080}
 .big-ovr{border-radius:0!important}
+.er-r{width:28px;height:28px;flex:none;font-weight:800;font-size:.75rem;background:#c0c0c0;color:#555;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0}
+.er-r.on{border-color:#404040 #fff #fff #404040;background:#ffe14d;color:#000}
+.er-r:disabled{opacity:.25}
+.er.rs{background:#fffbe0!important}
+.sw-p .pos{flex:none!important;min-width:22px;text-align:center}.sw-c>div{min-width:0}
 
 </style>
 
@@ -719,6 +724,9 @@ const GRPL={G:'Goleiros',D:'Defesa',M:'Meio-campo',A:'Ataque'};
 /* ===== camada Elifoot: força 1–50, posição G/D/M/A, craque (*) e comportamento ===== */
 /* estaduais fora do jogo: vagas na Série D, Copa do Brasil e copas regionais saem do ranking de força de cada estado */
 const NOEST=true;
+/* Série D com 20 clubes em pontos corridos, como as outras séries */
+const D20F=true;
+const D20=()=>INIT.Dg.flat().slice().sort((a,b)=>(STARTPW[b]||0)-(STARTPW[a]||0)).slice(0,20);
 const FZ=o=>Math.max(1,Math.min(50,Math.round((o-45)*50/45)));
 const GRPN={G:'Goleiro',D:'Defesa',M:'Médio',A:'Avançado'};
 const COMPN=['Fair Play','Cordeirinho','Cavalheiro','Caneleiro','Caceteiro','Sarrafeiro'];
@@ -927,8 +935,8 @@ function buildComps(P){
   C.A=makeComp('A',[rrSpec([P.A],2)]);
   C.B=makeComp('B',[rrSpec([P.B],2)]);
   C.C=makeComp('C',[rrSpec([P.C],1),{t:'rr',from:{k:'top',n:8,gs:4},legs:2,nd:6},koSpec(2,()=>2,'seed',{k:'grp',size:2})]);
-  C.D=makeComp('D',[rrSpec(P.Dg,2),koSpec(32,()=>2,'seed',{k:'grp',size:32})]);
-  C.D.stages[1].rounds[0].n='Segunda fase';
+  C.D=D20F&&P.D.length<=24?makeComp('D',[rrSpec([P.D],2)]):makeComp('D',[rrSpec(P.Dg,2),koSpec(32,()=>2,'seed',{k:'grp',size:32})]);
+  if(C.D.stages[1])C.D.stages[1].rounds[0].n='Segunda fase';
   C.CB=makeComp('CB',[cbSpec(P)]);
   const lib=g=>[rrSpec(g,2),koSpec(16,n=>n>2?2:1,'seed',{k:'grp',size:16})];
   C.LIB=makeComp('LIB',lib(P.LIBg));C.SUD=makeComp('SUD',lib(P.SUDg));
@@ -1144,7 +1152,7 @@ function newGame(tid,coach){
     initMgmt(t);S.teams[id]=t;
   });
   S.players=parsePlayers();reindex();
-  const P0={A:INIT.A,B:INIT.B,C:INIT.C,D:INIT.Dg.flat(),Dg:INIT.Dg,CB:INIT.CB,LIBg:INIT.LIBg,SUDg:INIT.SUDg,NEg:INIT.NEg,SSEg:INIT.SSEg,VERg:INIT.VERg,ST:INIT.ST,EX:INIT.EX};
+  const P0={A:INIT.A,B:INIT.B,C:INIT.C,D:D20F?D20():INIT.Dg.flat(),Dg:D20F?[D20()]:INIT.Dg,CB:INIT.CB,LIBg:INIT.LIBg,SUDg:INIT.SUDg,NEg:INIT.NEg,SSEg:INIT.SSEg,VERg:INIT.VERg,ST:INIT.ST,EX:INIT.EX};
   setDivs(P0);
   Object.keys(S.teams).forEach(id=>fillSquad(id,sqLen(id)<16?22:18));
   seedGems();S.gems=1;S.wfix=1;
@@ -1989,7 +1997,12 @@ function seasonEnd(){
   const C1=B.slice(16).concat(C.slice(4,16),D.slice(0,4));
   const Cdown=C.slice(16);
   const ex=new Set([...A1,...B1,...C1,...Cdown]);
-  const D1=Cdown.concat(statePicks(S.quota.D,ex,Rk));
+  let D1;
+  if(D20F){/* sobem os 4 clubes mais fortes fora das séries; caem os 4 últimos da D */
+    const keep=D.slice(4,16).filter(id=>!ex.has(id));keep.forEach(id=>ex.add(id));
+    const up=Object.values(S.teams).filter(t=>STN[t.reg]&&!ex.has(t.id)&&!D.slice(16).includes(t.id)).sort((a,b)=>(teamAvg(b.id)+b.rep/10)-(teamAvg(a.id)+a.rep/10)).slice(0,20-Cdown.length-keep.length).map(t=>t.id);
+    D1=Cdown.concat(keep,up)}
+  else D1=Cdown.concat(statePicks(S.quota.D,ex,Rk));
   const ab=new Set([...A1,...B1]);
   const CB1=[...A1,...B1].concat(statePicks(S.quota.CB,new Set(ab),Rk)).slice(0,128);
   const reg=k=>{const ids=statePicks(S.quota[k],new Set(),Rk);return snakeGroups(ids,S.quota.G[k])};
@@ -2017,7 +2030,7 @@ function seasonEnd(){
   S.sat=clamp(S.sat,0,100);
   const ST1=JSON.parse(JSON.stringify(S.P.ST));const nat=new Set([...A1,...B1,...C1,...D1]);const listed=new Set(Object.values(ST1).flat());
   Object.values(S.teams).forEach(t=>{if(STN[t.reg]&&!nat.has(t.id)&&!listed.has(t.id)&&ST1[t.reg]){ST1[t.reg].push(t.id);if(t.id===S.me)news(`Fora das séries nacionais, o ${t.name} passa a disputar o ${STN[t.reg]}.`)}});
-  nextSeason({A:A1,B:B1,C:C1,D:D1,Dg:regionGroups(D1,6),CB:CB1,LIBg:contGroups(LIB1),SUDg:contGroups(SUD1),NEg:reg('NE'),SSEg:reg('SSE'),VERg:reg('VER'),ST:ST1,EX:S.P.EX});
+  nextSeason({A:A1,B:B1,C:C1,D:D1,Dg:D20F?[D1]:regionGroups(D1,6),CB:CB1,LIBg:contGroups(LIB1),SUDg:contGroups(SUD1),NEg:reg('NE'),SSEg:reg('SSE'),VERg:reg('VER'),ST:ST1,EX:S.P.EX});
 }
 function nextSeason(P1){
   contractsEndOfSeason();
@@ -2255,11 +2268,11 @@ function render(){
 function seriesTablesHTML(tabs){
   const ks=Object.keys(tabs);const myK=ks.find(k=>tabs[k].some(r=>r[0]===S.me))||ks[0];
   const tbl=k=>{const rows=tabs[k];const n=rows.length;
-    const up=i=>k!=='A'&&i<4,down=i=>k!=='D'&&i>=16&&i<20,lim=k==="D"?12:n;
+    const up=i=>k!=='A'&&i<4,down=i=>(k!=='D'||n<=24)&&i>=16&&i<20,lim=k==="D"&&n>24?12:n;
     const myI=rows.findIndex(r=>r[0]===S.me);
     const show=rows.map((r,i)=>[r,i]).filter(([r,i])=>i<lim||i===myI);
     return `<div class="sumt" data-k="${k}" ${k===myK?'':'hidden'}>
-      <div class="sumleg"><span class="up">▲ ${k==='A'?'Campeão':'Sobem para a Série '+String.fromCharCode(k.charCodeAt(0)-1)}</span>${k!=='D'?`<span class="dn">▼ Descem para a Série ${String.fromCharCode(k.charCodeAt(0)+1)}</span>`:'<span class="mute">Os demais voltam a disputar vaga pelo estadual</span>'}</div>${rows.some((r,i)=>i&&i<lim&&r[1]>rows[i-1][1])?'<p class="tiny mute" style="margin:0 0 6px">Ordem final definida pelas fases finais · P, J e SG da 1ª fase.</p>':''}
+      <div class="sumleg"><span class="up">▲ ${k==='A'?'Campeão':'Sobem para a Série '+String.fromCharCode(k.charCodeAt(0)-1)}</span>${k!=='D'?`<span class="dn">▼ Descem para a Série ${String.fromCharCode(k.charCodeAt(0)+1)}</span>`:'<span class="dn">▼ Caem para fora das séries</span>'}</div>${rows.some((r,i)=>i&&i<lim&&r[1]>rows[i-1][1])?'<p class="tiny mute" style="margin:0 0 6px">Ordem final definida pelas fases finais · P, J e SG da 1ª fase.</p>':''}
       <div class="sumrows"><div class="sumh"><span>#</span><span>Clube</span><span>P</span><span>J</span><span>SG</span></div>
       ${show.map(([r,i],j)=>`${k==='D'&&i===myI&&i>=lim?'<div class="sumgap">…</div>':''}<div class="sumr ${up(i)||(k==='A'&&i===0)?'zu':''} ${down(i)?'zd':''} ${r[0]===S.me?'me':''}"><span>${i+1}</span><span class="tm">${crest(r[0],18)}<b>${esc(T(r[0]).name)}</b>${up(i)?'<i class="up">▲</i>':down(i)?'<i class="dn">▼</i>':''}</span><span><b>${r[1]}</b></span><span>${r[2]}</span><span>${r[3]>0?'+':''}${r[3]}</span></div>`).join('')}
       ${k==='D'&&n>lim?`<p class="tiny mute" style="text-align:center;margin:6px 0 0">+ ${n-lim} clubes</p>`:''}</div></div>`};
@@ -2271,7 +2284,7 @@ function teamPower(id){const s=(SQ.get(id)||[]).map(p=>p.o).sort((a,b)=>b-a).sli
 function renderStart(){
   const infos=Object.fromEntries(SLOTS.map(n=>[n,slotInfo(n)]));const old=hasOldSave();
   if(!UI.ns||!SLOTS.includes(UI.ns))UI.ns=SLOTS.find(n=>!infos[n])||SLOT;
-  const div={A:INIT.A,B:INIT.B,C:INIT.C,D:INIT.Dg.flat()};
+  const div={A:INIT.A,B:INIT.B,C:INIT.C,D:D20F?D20():INIT.Dg.flat()};
   const inNat=new Set(Object.values(div).flat());
   let ids;
   if(UI.pk==='E')ids=(INIT.ST[UI.pst]||[]).filter(id=>!inNat.has(id));
@@ -2288,6 +2301,8 @@ function renderStart(){
   ${old?`<div class="card"><p class="small">Há um jogo salvo da versão anterior (só Série A). Ele não abre nesta versão, que tem todas as divisões e copas.</p><button class="btn sm danger" data-a="delold">${UI.confirm==='old'?'Toque de novo para apagar':'Apagar save antigo'}</button></div>`:''}
   <div class="card"><h3>Novo jogo</h3>
     <label for="coach">Nome do técnico<input type="text" id="coach" value="" placeholder="Seu nome" maxlength="30"></label>
+    <button class="btn pri big" data-a="rndD">🎲 Time aleatório da Série D</button>
+    <p class="tiny mute" style="text-align:center">Como no Elifoot: comece de baixo e suba. Ou escolha um clube abaixo.</p>
     <p class="tiny mute" style="font-weight:700;margin:4px 0 0">SALVAR EM</p>
     <div class="chipset">${SLOTS.map(n=>`<button class="chipb ${UI.ns===n?'on':''}" data-a="nslot" data-v="${n}">${n} · ${infos[n]&&!infos[n].broken?esc(infos[n].name):'vazio'}</button>`).join('')}</div>
     ${infos[UI.ns]&&!infos[UI.ns].broken?`<p class="tiny dn">O espaço ${UI.ns} já tem o jogo do ${esc(infos[UI.ns].name)}. Começar aqui substitui esse jogo (vai pedir confirmação).</p>`:''}
@@ -3465,16 +3480,18 @@ function renderElenco(){
       <div class="row" style="gap:8px"><button class="btn pri big grow" data-a="kick" ${n<11?'disabled':''}>▶ Jogar</button><button class="btn" data-a="kickq" ${n<11?'disabled':''}>Simular</button></div></section>`:'';
   const g=k=>sq.filter(p=>GRP[p.p]===k).sort((a,b)=>(on.has(b.id)-on.has(a.id))||b.o-a.o);
   const row=p=>{const t=on.has(p.id);const fl=(p.inj?`<em class="fl inj">lesão ${p.inj}</em>`:'')+(p.sus?'<em class="fl inj">susp.</em>':'')+(p.sale?'<em class="fl sal">leilão</em>':'');
-    return `<div class="er ${t?'on':''} ${avail(p)?'':'out'}"><button class="er-ck" data-a="eltog" data-v="${p.id}" aria-label="${t?'Tirar':'Escalar'} ${esc(p.n)}">${t?'●':'○'}</button>${rpill(p.p)}<button class="er-nm" data-a="pl" data-v="${p.id}"><b>${esc(p.n)}${isStar(p)?' <i class="star">*</i>':''}</b><small>${p.a}a · ${COMPN[compOf(p)]} · ${money(wage(p))}/m · ${p.ct}a${p.g?` · ⚽${p.g}`:''}</small>${fl}</button><span class="er-f ${tier(p.o)}">${FZ(p.o)}</span></div>`};
+    const rs=(S.lineup.res||[]).includes(p.id);
+    return `<div class="er ${t?'on':''} ${rs?'rs':''} ${avail(p)?'':'out'}"><button class="er-ck" data-a="eltog" data-v="${p.id}" aria-label="${t?'Tirar':'Escalar'} ${esc(p.n)}">${t?'●':'○'}</button><button class="er-r ${rs?'on':''}" data-a="elres" data-v="${p.id}" ${t?'disabled':''} aria-label="Reserva">R</button>${rpill(p.p)}<button class="er-nm" data-a="pl" data-v="${p.id}"><b>${esc(p.n)}${isStar(p)?' <i class="star">*</i>':''}</b><small>${p.a}a · ${COMPN[compOf(p)]} · ${money(wage(p))}/m · ${p.ct}a${p.g?` · ⚽${p.g}`:''}</small>${fl}</button><span class="er-f ${tier(p.o)}">${FZ(p.o)}</span></div>`};
   return `${head}
   <div class="card el-top"><div class="el-sum"><div><small>Esquema</small><b>${formName()}</b></div><div><small>Titulares</small><b class="${n<11?'dn':''}">${n}/11</b></div><div><small>Força média</small><b>${avgF.toFixed(1)}</b></div><div><small>Moral</small><b>${moralTxt()}</b></div></div>
+    <div class="row" style="justify-content:space-between"><span class="small">Reservas relacionados: <b class="${(S.lineup.res||[]).length?'':'dn'}">${(S.lineup.res||[]).length}/${MAXRES}</b> (só eles podem entrar no jogo)</span><button class="btn sm" data-a="elresauto">Reservas automáticos</button></div>
     ${warn.length?`<p class="warn">${warn.join(' ')}</p>`:''}
     <p class="tiny mute" style="margin:4px 0">Toque na bolinha para escalar ou tirar. O esquema sai de quantos defesas, médios e avançados você escala. Escalar automático:</p>
     <div class="roles">${ELFORMS.map(f=>`<button class="chipb ${formName()===f?'on':''}" data-a="elauto" data-v="${f}">${f}</button>`).join('')}</div>
     <p class="tiny mute" style="margin:6px 0 4px;font-weight:700">POSTURA</p>
     <div class="seg seg5">${Object.entries(POST).map(([k,v])=>`<button class="${(S.lineup.tac||'equ')===k?'on':''}" data-a="elpost" data-v="${k}">${({udf:'Ultra­def.',def:'Defensivo',equ:'Equilibrado',ofe:'Ofensivo',uof:'Ultra­of.'})[k]}</button>`).join('')}</div></div>
   ${['G','D','M','A'].map(k=>{const l=g(k);return `<div class="card el-g"><h3>${GRPL[k]} <span class="tiny mute">${l.filter(p=>on.has(p.id)).length} escalados · ${l.length} no elenco</span></h3>${l.map(row).join('')||'<p class="small mute">Ninguém.</p>'}</div>`}).join('')}
-  <p class="hint">✱ / * = craque: finaliza e cobra pênalti melhor. Comportamento (Fair Play → Sarrafeiro) muda a chance de cartão. Força de 1 a 50.</p>`;
+  <p class="hint">● = titular · R = reserva relacionado (até 11). ✱ / * = craque: finaliza e cobra pênalti melhor. Comportamento (Fair Play → Sarrafeiro) muda a chance de cartão. Força de 1 a 50.</p>`;
 }
 const moralTxt=()=>{const v=T(S.me).mood;return v>=80?'Ótima':v>=62?'Boa':v>=45?'Normal':v>=30?'Baixa':'Péssima'};
 
@@ -3546,9 +3563,9 @@ function renderMatch(){
 /* ---------- ações do modo Elifoot ---------- */
 Object.assign(ACT,{
   eltog:v=>{const id=+v,p=P(id);const xi=S.lineup.xi;const i=xi.indexOf(id);
-    if(i>=0)xi[i]=null;else{if(!avail(p))return toast(p.inj?'Lesionado.':'Suspenso.');const k=xi.findIndex(x=>!x||!P(x));if(k<0)return toast('Já são 11 titulares: tire alguém antes.');xi[k]=id}
+    if(i>=0)xi[i]=null;else{if(!avail(p))return toast(p.inj?'Lesionado.':'Suspenso.');const k=xi.findIndex(x=>!x||!P(x));if(k<0)return toast('Já são 11 titulares: tire alguém antes.');xi[k]=id;S.lineup.res=(S.lineup.res||[]).filter(x=>x!==id)}
     S.lineup.last=xi.map(grpOfId);save();render()},
-  elauto:v=>{S.lineup.xi=elPick(S.me,v);S.lineup.last=S.lineup.xi.map(grpOfId);save();render();toast(`Melhores escalados no ${v}.`)},
+  elauto:v=>{S.lineup.xi=elPick(S.me,v);S.lineup.res=elRes(S.lineup.xi);S.lineup.last=S.lineup.xi.map(grpOfId);save();render();toast(`Melhores escalados no ${v}.`)},
   elout:v=>{MS.eo=MS.eo===+v?null:+v;renderMatch()},
   elin:v=>{const m=MS.mine,me=S.me;if(m.subs[me]>=MAXSUB)return toast(`Limite de ${MAXSUB} substituições.`);
     if(m.gap[me].length){m.gap[me].shift();doSub(m,me,null,+v)}
@@ -3576,7 +3593,38 @@ Object.assign(ACT,{
 
 Object.assign(ACT,{elpost:v=>{S.lineup.tac=v;save();render()}});
 
+/* ---------- começar com um time sorteado da Série D ---------- */
+ACT.rndD=()=>{const ids=D20();const id=ids[Math.floor(Math.random()*ids.length)];toast(`Sorteado: ${TMETA[id].name}!`);ACT.pick(id)};
+
+/* ---------- 11 reservas relacionados ---------- */
+const MAXRES=11;
+function elRes(xi){
+  const on=new Set((xi||S.lineup.xi).filter(Boolean));
+  const pool=squad(S.me).filter(p=>avail(p)&&!on.has(p.id)).sort((a,b)=>b.o-a.o);
+  const out=[];const g=pool.find(p=>GRP[p.p]==='G');if(g)out.push(g.id);
+  /* pelo menos um de cada setor, depois os melhores */
+  for(const k of ['D','M','A']){const p=pool.find(p=>GRP[p.p]===k&&!out.includes(p.id));if(p)out.push(p.id)}
+  for(const p of pool){if(out.length>=MAXRES)break;if(!out.includes(p.id)&&!(GRP[p.p]==='G'&&out.filter(id=>GRP[P(id).p]==='G').length>=2))out.push(p.id)}
+  return out.slice(0,MAXRES);
+}
+const _fixXI=fixMyXI;
+fixMyXI=function(){const ch=_fixXI();const xi=new Set(S.lineup.xi.filter(Boolean));
+  let r=(S.lineup.res||[]).filter(id=>{const p=P(id);return p&&p.t===S.me&&avail(p)&&!xi.has(id)});
+  if(!r.length)r=elRes();S.lineup.res=r.slice(0,MAXRES);return ch};
+function bench(m,t){
+  const onIds=new Set(m.on[t].map(x=>x[1]));let l=squad(t).filter(p=>avail(p)&&!onIds.has(p.id)&&!m.left[t].includes(p.id)&&!(m.app[t]||[]).includes(p.id));
+  if(t===S.me&&S.lineup.res&&S.lineup.res.length)l=l.filter(p=>S.lineup.res.includes(p.id));
+  else if(t!==S.me){const top=new Set(squad(t).filter(p=>avail(p)&&!onIds.has(p.id)).sort((a,b)=>b.o-a.o).slice(0,MAXRES).map(p=>p.id));l=l.filter(p=>top.has(p.id))}
+  return l;
+}
+Object.assign(ACT,{
+  elres:v=>{const id=+v;S.lineup.res=S.lineup.res||[];const i=S.lineup.res.indexOf(id);
+    if(i>=0)S.lineup.res.splice(i,1);else{if(S.lineup.xi.includes(id))return toast('Ele já é titular.');if(!avail(P(id)))return toast('Indisponível.');if(S.lineup.res.length>=MAXRES)return toast(`Já são ${MAXRES} reservas: tire alguém antes.`);S.lineup.res.push(id)}
+    save();render()},
+  elresauto:()=>{S.lineup.res=elRes();save();render();toast('Reservas escolhidos automaticamente.')}
+});
+
 </script>
-<script>const APPV="34";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="35";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
