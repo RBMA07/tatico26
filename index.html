@@ -723,6 +723,8 @@ input::placeholder{color:#7fb38f}
 .ec-f.evd{background:#d23b30!important;color:#fff!important;border-radius:3px}
 .big-ovr.evu{background:#2f7de1!important;color:#fff!important}.big-ovr.evd{background:#d23b30!important;color:#fff!important}
 .sti{font-style:normal;font-size:.72rem;margin-left:3px;white-space:nowrap}.sti small{font-size:.6rem;font-weight:800;color:#fff;margin-left:1px}
+.gmine{cursor:pointer}.gev-tip{margin:-4px 0 0;text-align:center;font-size:.68rem;color:#9fd3b0}.gev-x{margin:4px 0 0;text-align:center;font-size:.66rem;color:#9fd3b0}.gev{max-height:42vh;overflow:auto;cursor:pointer}
+#match .wrap.el>*{flex-shrink:0}
 
 </style>
 
@@ -3557,7 +3559,7 @@ function renderMatch(){
   const comps=(MS.all||[]).slice().sort(([a],[b])=>((b===c)-(a===c))||((order.indexOf(a.id)+99)%99-(order.indexOf(b.id)+99)%99));
   const shown=UI.allg?comps:comps.filter(([cc])=>cc===c||order.includes(cc.id)).slice(0,6);
   const grid=shown.map(([cc,res])=>`<div class="gsec"><div class="gh">${esc(cc.n)}</div>${res.map(x=>{const mine=x===m;const [gh,ga]=mine?[shH,shA]:liveScore(x,cur);const hot=!MS.done&&x.ev.some(e=>(e.k==='gol'||e.k==='pg')&&e.min<=cur&&e.min>cur-3);
-      return `<div class="gr ${mine?'mine':''} ${hot?'hot':''}" ${mine&&!MS.done?'data-a="mpause"':''}>${tbox(x.h)}<b class="gs">${gh}</b><b class="gs">${ga}</b>${tbox(x.a)}${lastEv(x,cur)}</div>`}).join('')}</div>`).join('');
+      return `<div class="gr ${mine?'mine':''} ${hot?'hot':''}" ${mine?'data-a="mev"':''}>${tbox(x.h)}<b class="gs">${gh}</b><b class="gs">${ga}</b>${tbox(x.a)}${lastEv(x,cur)}</div>`}).join('')}</div>`).join('');
   const more=comps.length>shown.length?`<button class="btn sm gmore" data-a="allg">Ver todos os jogos do dia (${comps.reduce((s,[,r])=>s+r.length,0)})</button>`:'';
   /* painel de trocas (pausa / intervalo / clique no seu time) */
   let panel='';
@@ -3588,7 +3590,8 @@ function renderMatch(){
   const _ow=$('#match .wrap'),_st=_ow?_ow.scrollTop:0;
   $('#match').innerHTML=`<div class="wrap el">
     <div class="gtop"><span class="hg ${MS.paused||MS.done?'':'run'}">⏳</span><b>${clock}</b><span class="gl">${esc(label)}</span></div>
-    <div class="gmine">${tbox(m.h)}<b class="gs big">${shH}</b><b class="gs big">${shA}</b>${tbox(m.a)}</div>
+    <div class="gmine" data-a="mev">${tbox(m.h)}<b class="gs big">${shH}</b><b class="gs big">${shA}</b>${tbox(m.a)}</div>
+    ${MS.showEv?`<div class="gev" data-a="mev">${evs.map(e=>`<div class="${e.t===me?'us':''} k-${e.k}"><span>${e.min}'</span><span>${ICON[e.k]||''}</span><span>${esc(e.n)} <i>${esc(T(e.t).code)}</i></span></div>`).join('')||'<div><span></span><span></span><span>A bola vai rolar…</span></div>'}<p class="gev-x">toque para fechar</p></div>`:'<p class="gev-tip">toque no placar para ver os lances</p>'}
     <div class="ginfo"><span>Público ${(m.pub||0).toLocaleString('pt-BR')}</span><span>Árbitro ${esc(m.ref?m.ref.n:'—')}</span>${m.down[m.h]||m.down[m.a]?`<span>🟥 ${m.down[m.h]||0}–${m.down[m.a]||0}</span>`:''}${MS.done&&m.pens?`<span>Pênaltis ${m.pens[0]}–${m.pens[1]}</span>`:''}</div>
     ${ctrl}
     ${panel}
@@ -3703,7 +3706,9 @@ function injure(m,t){
 /* ícones de situação: 🟥 suspenso, 🚑 lesionado (dias), 🟨 amarelos acumulados */
 function stIcons(p){return (p.sus?'<i class="sti">🟥</i>':'')+(p.inj?`<i class="sti">🚑<small>${p.inj}</small></i>`:'')+(p.yc?`<i class="sti">🟨${p.yc>1?'<small>'+p.yc+'</small>':''}</i>`:'')}
 
+ACT.mev=()=>{MS.showEv=!MS.showEv;renderMatch()};
+
 </script>
-<script>const APPV="42";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="43";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
