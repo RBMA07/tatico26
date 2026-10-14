@@ -509,15 +509,19 @@ function initPot(p){
   p.pot=clamp(p.o+g,p.o,93);p.o0=p.o;p.h=[p.o];
 }
 function migrate(p){if(LEGACY[p.p])p.p=LEGACY[p.p];if(p.p2&&!RN[p.p2])p.p2='';if(p.pot==null)initPot(p);if(p.o0==null)p.o0=p.o;if(!p.h)p.h=[p.o]}
+/* VK: preço de transferência (valores de mercado baixados à metade); salário segue a escala anterior */
+const VK=.5;
 function value(p){
   const e=p.a<=23?Math.max(p.o,(p.o+p.pot)/2):p.o;
   /* abaixo de 64 o valor cai mais rápido: jogador de Série D vale centenas de milhares, não milhões */
   let v=Math.pow(1.17,e-55)*(e<64?Math.pow(1.12,e-64):1);
   if(p.a<=21)v*=1.35;else if(p.a<=24)v*=1.15;else if(p.a>=34)v*=.35;else if(p.a>=31)v*=.65;
-  return Math.max(.02,v);
+  return Math.max(.01,v*VK);
 }
 /* salário MENSAL (R$ milhões) */
-const baseWage=p=>value(p)*.0055*MO+.012;
+/* salário pela força atual (não pelo potencial): garoto promissor ainda ganha como garoto */
+const wageVal=p=>{const o=p.o;let v=Math.pow(1.17,o-55)*(o<64?Math.pow(1.12,o-64):1);if(p.a>=34)v*=.5;else if(p.a>=31)v*=.75;return v};
+const baseWage=p=>wageVal(p)*.0055*MO+.012;
 const wage=p=>p.w??baseWage(p);
 const starLv=v=>v>=85?5:v>=79?4:v>=73?3:v>=67?2:1;
 const potStars=p=>{const c=starLv(p.o),t=Math.max(c,starLv(p.pot));return '★'.repeat(c)+'☆'.repeat(t-c)};
@@ -537,6 +541,15 @@ function fillSquad(tid,min){
   for(const r of ROLES){let have=(SQ.get(tid)||[]).filter(p=>p.p===r||p.p2===r).length;while(have<NEED[r]){addPlayer(genPlayer(tid,r,base,ri(18,31)));have++}}
   while(sqLen(tid)<min)addPlayer(genPlayer(tid,pick(GENROLES),base,ri(18,31)));
 }
+/* joias escondidas: garotos de 16–19 anos com potencial alto nos clubes menores (C, D, distritais e pequenos do exterior) */
+function gemPot(){const r=R();return r<.06?ri(85,90):r<.3?ri(79,84):ri(71,78)}
+function addGem(tid){
+  const t=S.teams[tid];const a=ri(16,19);const base=Math.max(44,Math.min(teamAvg(tid),66)-ri(4,9));
+  const p=genPlayer(tid,pick(GENROLES),base,a);p.pot=Math.max(p.o+6,gemPot());if(p.pot>=80)p.prom=1;
+  p.ct=ri(2,4);p.w=baseWage(p);addPlayer(p);return p;
+}
+const smallClub=t=>['C','D','E'].includes(t.div)||(t.div==='X'&&t.rep<62)||(t.div==='B'&&t.rep<55);
+function seedGems(){let n=0;Object.values(S.teams).forEach(t=>{if(t.id===S.me||!smallClub(t))return;const k=t.div==='E'?ri(1,2):ri(1,2);for(let i=0;i<k;i++){addGem(t.id);n++}});return n}
 function refillFree(){let f=sqLen(null);while(f<60){addPlayer(genPlayer(null,pick(['GOL',...GENROLES]),ri(52,66),ri(20,33)));f++}}
 
 /* ==================== COMPETIÇÕES: METADADOS ==================== */
@@ -823,6 +836,7 @@ function newGame(tid,coach){
   const P0={A:INIT.A,B:INIT.B,C:INIT.C,D:INIT.Dg.flat(),Dg:INIT.Dg,CB:INIT.CB,LIBg:INIT.LIBg,SUDg:INIT.SUDg,NEg:INIT.NEg,SSEg:INIT.SSEg,VERg:INIT.VERg,ST:INIT.ST,EX:INIT.EX};
   setDivs(P0);
   Object.keys(S.teams).forEach(id=>fillSquad(id,sqLen(id)<16?22:18));
+  seedGems();S.gems=1;S.wfix=1;
   refillFree();
   startSeason(P0);
   S.lineup.xi=assign(tid,myRoles());
@@ -1184,21 +1198,21 @@ function econ(t){
   e.sal=(SQ.get(t.id)||[]).reduce((s,p)=>s+wage(p),0)*(dv==='E'?.6:1);
   e.man=(.04*t.lvl+capNow(t)/1e6*.5)*MO*DOP[dv];
   /* custo fixo + 12% da receita (impostos, base, departamentos) */
-  e.op=(.2+.6*t.rep/100)*MO*DOP[dv]+.12*(e.tv+e.pat+e.tk+e.box+e.soc+e.loja);
+  e.op=(.2+.6*t.rep/100)*MO*DOP[dv]+.22*(e.tv+e.pat+e.tk+e.box+e.soc+e.loja);
   e.jur=t.cash<0?-t.cash*.018:0;
   e.rec=e.tv+e.pat+e.tk+e.box+e.soc+e.loja;e.desp=e.sal+e.man+e.op+e.jur;e.net=e.rec-e.desp;
   return e;
 }
 const PROJ={
-  arq:{n:'Ampliar arquibancada',d:'+5.000 lugares. Durante a obra o estádio opera com 85% da capacidade.',cost:t=>18+t.cap/4000,rounds:14,ok:t=>t.cap<80000,apply:t=>{t.cap+=5000}},
-  mod:{n:'Modernizar o estádio',d:'+1 nível de estrutura: torcida aceita ingresso mais caro e comparece mais.',cost:t=>15*t.lvl,rounds:18,ok:t=>t.lvl<5,apply:t=>{t.lvl++}},
-  box:{n:'Construir camarotes',d:'+R$ 350 mil de receita por jogo em casa (até 3).',cost:()=>12,rounds:10,ok:t=>t.box<3,apply:t=>{t.box++}},
-  shop:{n:'Abrir lojas oficiais',d:'+15% nas vendas de camisas e suvenires (até 3).',cost:()=>6,rounds:6,ok:t=>t.shop<3,apply:t=>{t.shop++}}
+  arq:{n:'Ampliar arquibancada',d:'+5.000 lugares. Durante a obra o estádio opera com 85% da capacidade.',cost:t=>8+t.cap/8000,rounds:14,ok:t=>t.cap<80000,apply:t=>{t.cap+=5000}},
+  mod:{n:'Modernizar o estádio',d:'+1 nível de estrutura: torcida aceita ingresso mais caro e comparece mais.',cost:t=>7*t.lvl,rounds:18,ok:t=>t.lvl<5,apply:t=>{t.lvl++}},
+  box:{n:'Construir camarotes',d:'+R$ 350 mil de receita por jogo em casa (até 3).',cost:()=>5,rounds:10,ok:t=>t.box<3,apply:t=>{t.box++}},
+  shop:{n:'Abrir lojas oficiais',d:'+15% nas vendas de camisas e suvenires (até 3).',cost:()=>3,rounds:6,ok:t=>t.shop<3,apply:t=>{t.shop++}}
 };
 const CAMP={
-  kit:{n:'Lançar nova camisa',d:'Vendas da loja +50% por cerca de 3 meses.',cost:()=>3,rounds:24},
-  soc:{n:'Campanha de sócio-torcedor',d:'Sócios crescem 1,5% a cada data por cerca de 6 semanas.',cost:()=>2,rounds:12},
-  pub:{n:'Campanha publicitária',d:'Patrocínio +30% e torcida mais animada por cerca de 2 meses.',cost:()=>4,rounds:18}
+  kit:{n:'Lançar nova camisa',d:'Vendas da loja +50% por cerca de 3 meses.',cost:()=>1.5,rounds:24},
+  soc:{n:'Campanha de sócio-torcedor',d:'Sócios crescem 1,5% a cada data por cerca de 6 semanas.',cost:()=>1,rounds:12},
+  pub:{n:'Campanha publicitária',d:'Patrocínio +30% e torcida mais animada por cerca de 2 meses.',cost:()=>2,rounds:18}
 };
 const wk=n=>`~${Math.max(1,Math.round(n/2))} semana${Math.round(n/2)>1?'s':''}`;
 function addFin(k,v){S.finS[k]=(S.finS[k]||0)+v}
@@ -1538,6 +1552,8 @@ function nextSeason(P1){
   setDivs(P1);
   /* base: todos os clubes revelam garotos; o seu recebe 2 promessas */
   Object.keys(S.teams).forEach(id=>{if(id!==S.me&&R()<.7){const b=teamAvg(id)-10;const y=genPlayer(id,pick(GENROLES),b,17);y.pot=clamp(y.o+ri(6,15),y.o,90);addPlayer(y)}});
+  /* clubes menores revelam joias com mais frequência */
+  Object.values(S.teams).forEach(t=>{if(t.id!==S.me&&smallClub(t)&&R()<.35)addGem(t.id)});
   Object.keys(S.teams).forEach(id=>fillSquad(id,id===S.me?18:20));
   const base=teamAvg(S.me)-8;
   for(let i=0;i<2;i++){const y=genPlayer(S.me,pick(GENROLES),base,17);y.pot=clamp(y.o+ri(8,16),y.o,92);y.ct=3;y.w=.02;addPlayer(y);news(`Base promove ${y.n} (${RN[y.p]}, força ${y.o}, potencial ${potStars(y)}).`)}
@@ -1578,6 +1594,8 @@ function useState(obj){
   S.auctions=S.auctions||[];S.coachPool=S.coachPool||[];S.finS=S.finS||{};S.triedC=S.triedC||{};S.tried=S.tried||{};if(S.fired===undefined)S.fired=null;
   if(!S.lineup.pos||S.lineup.pos.length!==11||!S.lineup.xi||S.lineup.xi.length!==11){S.lineup.form='4-2-3-1';S.lineup.pos=presetPos('4-2-3-1');S.lineup.xi=assign(S.me,myRoles())}
   S.lineup.pos=S.lineup.pos.map(q=>snap(q.x,q.y));
+  if(!S.gems){seedGems();S.gems=1;save()}
+  if(!S.wfix){S.players.forEach(p=>{if(p.t)p.w=baseWage(p)*(.9+R()*.2)});S.wfix=1}
   UI.tab='clube';UI.tc=null;
 }
 
@@ -2498,6 +2516,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="17";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="18";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
