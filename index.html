@@ -873,10 +873,12 @@ function migrate(p){if(LEGACY[p.p])p.p=LEGACY[p.p];if(p.p2&&!RN[p.p2])p.p2='';if
 /* VK: preço de transferência (valores de mercado baixados à metade); salário segue a escala anterior */
 const VK=.5;
 function value(p){
-  const e=p.a<=23?Math.max(p.o,(p.o+p.pot)/2):p.o;
+  /* jovem vale um pouco mais pelo potencial, mas quem ainda é fraco continua barato */
+  const e=p.a<=23?p.o+Math.min(Math.max(0,(p.pot||p.o)-p.o)*(p.a<=21?.25:.2),6):p.o;
   /* abaixo de 64 o valor cai mais rápido: jogador de Série D vale centenas de milhares, não milhões */
   let v=Math.pow(1.17,e-55)*(e<64?Math.pow(1.12,e-64):1);
   if(p.a<=21)v*=1.35;else if(p.a<=24)v*=1.15;else if(p.a>=34)v*=.35;else if(p.a>=31)v*=.65;
+  if(p.o<54)v*=.6;
   return Math.max(.01,v*VK);
 }
 /* salário MENSAL (R$ milhões) */
@@ -2544,7 +2546,7 @@ function marketList(){
   const k={o:p=>-p.o,pot:p=>-p.pot,a:p=>p.a,$:p=>ask(p)}[UI.msort];
   const pool=UI.mfree?(SQ.get(null)||[]):S.players;
   const o1=+UI.mo1||0,o2=+UI.mo2||99,a2=+UI.ma2||99;let p1=+UI.mp1||0,p2=UI.mp2===''||UI.mp2==null?1e9:+UI.mp2;if(UI.mcash)p2=Math.min(p2,Math.max(0,T(S.me).cash));
-  let list=pool.filter(p=>p.t!==S.me&&(UI.mfree?p.t===null:p.t!==null)&&FZ(p.o)>=o1&&FZ(p.o)<=o2&&p.a<=a2&&(UI.mpos==='T'||GRP[p.p]===UI.mpos||p.p===UI.mpos)&&(!q||p.n.toLowerCase().includes(q)||(p.t&&T(p.t).name.toLowerCase().includes(q))));
+  let list=pool.filter(p=>p.t!==S.me&&(UI.mfree?p.t===null:p.t!==null)&&FZ(p.o)>=o1&&FZ(p.o)<=o2&&p.a<=a2&&(UI.mpos==='T'||GRP[p.p]===UI.mpos||p.p===UI.mpos)&&(!UI.mstar||isStar(p))&&(!UI.mprom||p.prom)&&(!q||p.n.toLowerCase().includes(q)||(p.t&&T(p.t).name.toLowerCase().includes(q))));
   /* preço: corte barato pelo valor (o pedido fica entre 1,05× e 1,35× o valor) e depois o preço exato */
   if(p1>0||p2<1e9){list=list.filter(p=>{const v=value(p);return v*(p.t?1.35:.15)>=p1&&v*(p.t?1.05:.15)<=p2});if(list.length<=1500)list=list.filter(p=>{const a=ask(p);return a>=p1&&a<=p2})}
   /* pré-corte barato pela força antes de calcular preços (o preço consulta o elenco do vendedor) */
@@ -2559,12 +2561,12 @@ function renderMercado(){
   <div class="stats"><div class="stat"><small>Caixa</small><b>${money(T(S.me).cash)}</b></div><div class="stat"><small>Elenco</small><b>${sqLen(S.me)}/34</b></div><div class="stat"><small>Folha/mês</small><b>${money(squad(S.me).reduce((s,p)=>s+wage(p),0))}</b></div></div>
   <div class="search">${ICONS.search}<input type="text" id="mq" data-in="mq" placeholder="Buscar jogador ou clube" value="${esc(UI.mq)}" aria-label="Buscar"></div>
   <div class="roles">${['T','G','D','M','A'].map(k=>`<button class="chipb ${UI.mpos===k?'on':''}" data-a="mpos" data-v="${k}">${k==='T'?'Todas':GRPL[k]}</button>`).join('')}</div>
-  <div class="chipset"><button class="chipb ${UI.mfree?'on':''}" data-a="mfree">Sem clube</button>${[['o','Maior força'],['pot','Potencial'],['a','Mais jovens'],['$','Mais baratos']].map(([k,n])=>`<button class="chipb ${UI.msort===k?'on':''}" data-a="msort" data-v="${k}">${n}</button>`).join('')}</div>
+  <div class="chipset"><button class="chipb ${UI.mstar?'on':''}" data-a="mstar">* Craques</button><button class="chipb ${UI.mprom?'on':''}" data-a="mprom">💎 Promessas</button><button class="chipb ${UI.mfree?'on':''}" data-a="mfree">Sem clube</button>${[['o','Maior força'],['pot','Potencial'],['a','Mais jovens'],['$','Mais baratos']].map(([k,n])=>`<button class="chipb ${UI.msort===k?'on':''}" data-a="msort" data-v="${k}">${n}</button>`).join('')}</div>
   <div class="card mfil"><div class="mfr"><span>Força</span><input type="number" inputmode="numeric" min="1" max="50" placeholder="1" data-in="mo1" value="${esc(UI.mo1||'')}" aria-label="Força mínima"><i>a</i><input type="number" inputmode="numeric" min="1" max="50" placeholder="50" data-in="mo2" value="${esc(UI.mo2||'')}" aria-label="Força máxima"></div>
     <div class="mfr"><span>Preço (R$ mi)</span><input type="number" inputmode="decimal" step="0.1" min="0" placeholder="de" data-in="mp1" value="${esc(UI.mp1||'')}" aria-label="Preço mínimo"><i>a</i><input type="number" inputmode="decimal" step="0.1" min="0" placeholder="até" data-in="mp2" value="${esc(UI.mp2||'')}" aria-label="Preço máximo"></div>
     <div class="mfr"><span>Idade até</span><input type="number" inputmode="numeric" min="16" max="40" placeholder="—" data-in="ma2" value="${esc(UI.ma2||'')}" aria-label="Idade máxima"><button class="chipb ${UI.mcash?'on':''}" data-a="mcash">Cabe no caixa</button>${UI.mo1||UI.mo2||UI.mp1||UI.mp2||UI.ma2||UI.mcash?'<button class="chipb" data-a="mclr">Limpar</button>':''}</div></div>
   <div class="card"><div class="list" id="mlist">${mlistHTML()}</div></div>
-  <p class="hint">Busca entre os ${S.players.length.toLocaleString('pt-BR')} jogadores do Brasil e da América do Sul. O filtro de função inclui quem tem aquela função como secundária. Titulares do clube vendedor custam 35% a mais.</p>`;
+  <p class="hint">Busca entre os ${S.players.length.toLocaleString('pt-BR')} jogadores do Brasil e da América do Sul. * = craque (decide mais o jogo). 💎 = promessa: jovem com potencial alto, que ainda pode estar fraco hoje. Titulares do clube vendedor custam 35% a mais.</p>`;
 }
 function crestTeams(){
   const q=UI.crq.trim().toLowerCase();
@@ -3711,7 +3713,9 @@ function stIcons(p){return (p.sus?'<i class="sti">🟥</i>':'')+(p.inj?`<i class
 
 ACT.mev=()=>{MS.showEv=!MS.showEv;renderMatch()};
 
+Object.assign(ACT,{mstar:()=>{UI.mstar=!UI.mstar;render()},mprom:()=>{UI.mprom=!UI.mprom;render()}});
+
 </script>
-<script>const APPV="44";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="45";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
