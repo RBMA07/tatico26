@@ -573,8 +573,6 @@ tr.tlink:active td{background:var(--accent-soft)}
 .el-pre .btn:not(.pri){background:#063d1c;color:#fff;border-color:#2a7a45}
 .gctl .btn.grow{flex:1 1 100%}
 .gctl .btn.sm{flex:1}
-.sw .mtbl>div.me{background:#ffe14d!important;color:#2a2400!important}
-.sw .mtbl>div.me *{color:#2a2400!important}
 .seg5 button{font-size:.68rem;padding:6px 1px;white-space:nowrap;min-width:0}
 .gpost{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
 .gpost button{background:#063d1c;border:1px solid #2a7a45;color:#e8f7ec;border-radius:8px;padding:6px 2px;font:inherit;font-size:.7rem;font-weight:700}
@@ -683,7 +681,8 @@ input::placeholder{color:#7fb38f}
 .sw-p.sel{border-color:#ffe14d;background:rgba(255,225,77,.15)}
 .sw-p .pos{flex:none!important;min-width:22px;text-align:center}.sw-c>div{min-width:0}
 .sw .mtbl>div{color:#f3fbf5}
-.sw .mtbl>div.me,.sw .mtbl>div.me *{background:rgba(255,225,77,.15);color:#ffe14d!important}
+.sw .mtbl>div.me{background:#ffe14d!important;border-radius:4px}
+.sw .mtbl>div.me,.sw .mtbl>div.me *{color:#1f1a00!important;font-weight:800}
 /* outros */
 .toast{background:#073d1c!important;color:#fff!important;border:1px solid #ffe14d!important}
 .warn{color:#ffb4a8}
@@ -3663,6 +3662,6 @@ Object.assign(ACT,{
 });
 
 </script>
-<script>const APPV="37";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="38";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
