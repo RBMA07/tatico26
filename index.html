@@ -1724,14 +1724,14 @@ function renderElenco(){
     ${myRoles().filter(r=>r==='GOL').length!==1?`<p class="warn">Deixe exatamente uma bolinha na área do goleiro.</p>`:''}
     ${off?`<p class="small" style="color:var(--gold);font-weight:600">${off} improvisado(s): o número amarelo é quanto perdem de força fora da função.</p>`:''}
     <div><p class="tiny mute" style="margin-bottom:6px;font-weight:600">BANCO · ${sq.length-xiFilled()} jogadores · arraste para o campo</p>${renderBench()}</div>
-    <p class="hint">Arraste uma bolinha até um dos locais marcados: ela encaixa ali e a função e o esquema se ajustam sozinhos. Solte em cima de outro jogador para trocar os dois de lugar. Toque para escolher quem joga ali.</p>
+    ${mf?'':`<p class="hint">Arraste uma bolinha até um dos locais marcados: ela encaixa ali e a função e o esquema se ajustam sozinhos. Solte em cima de outro jogador para trocar os dois de lugar. Toque para escolher quem joga ali.</p>`}
     <div class="roles">${Object.keys(FORMS).map(f=>`<button class="chipb ${formName()===f?'on':''}" data-a="form" data-v="${f}">${f}</button>`).join('')}</div>
     <div class="row"><button class="btn grow" data-a="auto">Escalar os melhores neste desenho</button></div>
     <div class="seg">${Object.entries(TAC).map(([k,v])=>`<button class="${S.lineup.tac===k?'on':''}" data-a="tac" data-v="${k}">${v.n}</button>`).join('')}</div>
   </div>
-  <div class="card"><div class="card-h"><h3>Elenco · ${sq.length}</h3><span class="tiny mute">Folha ${money(sq.reduce((s,p)=>s+wage(p),0))}/mês</span></div>
+  ${mf?`<p class="hint" style="text-align:center">Toque num jogador para trocar · arraste para mudar a posição. O elenco completo fica na aba Elenco.</p>`:`<div class="card"><div class="card-h"><h3>Elenco · ${sq.length}</h3><span class="tiny mute">Folha ${money(sq.reduce((s,p)=>s+wage(p),0))}/mês</span></div>
     <div class="list">${['G','D','M','A'].map(g=>{const gr=sq.filter(p=>GRP[p.p]===g).sort((a,b)=>ROLES.indexOf(a.p)-ROLES.indexOf(b.p)||b.o-a.o);return gr.length?`<div class="grp">${GRPL[g]}</div>`+gr.map(p=>playerRow(p)).join(''):''}).join('')}</div>
-  </div>`;
+  </div>`}`;
 }
 
 /* ==================== TABELAS E CHAVES ==================== */
@@ -2219,11 +2219,14 @@ const ACT={
   mspot:v=>{const m=MS.mine,me=S.me;const [x,y]=v.split(',').map(Number);const e=m.on[me].find(o=>o[1]===MS.selOut);if(!e)return;const r=zoneRole(x,y);
     if(r==='GOL'&&m.on[me].some(o=>o[0]==='GOL'&&o!==e))return toast('Já há um goleiro em campo.');
     m.posMe[e[1]]={x,y};e[0]=r;m.dirty=true;MS.selOut=null;toast(`${P(e[1]).n} agora joga como ${RN[r].toLowerCase()}.`);renderMatch()},
-  mform:v=>{const m=MS.mine,me=S.me;const on=m.on[me];if(on.length!==11)return toast('Com jogador a menos, ajuste as posições uma a uma.');
-    const slots=FORMS[v].map(([r,x,y])=>({r,x,y}));const pool=on.map(o=>P(o[1]));const used=new Set();const out=[];
+  mform:v=>{const m=MS.mine,me=S.me;const on=m.on[me];if(!on.length)return;
+    let slots=FORMS[v].map(([r,x,y])=>({r,x,y}));
+    /* com expulsão/lesão sem troca, o esquema perde primeiro um jogador de frente */
+    const DROP=['PE','PD','MOF','CA','MEI','VOL','LD','LE','ZAG'];
+    while(slots.length>on.length){const r=DROP.find(r=>slots.some(s=>s.r===r));const k=slots.map(s=>s.r).lastIndexOf(r);slots.splice(k,1)}const pool=on.map(o=>P(o[1]));const used=new Set();const out=[];
     const pickFor=(s,nat)=>{const c=pool.filter(p=>!used.has(p.id)&&(!nat||penP(p,s.r)<=1)&&(s.r!=='GOL'||p.p==='GOL'||!pool.some(q=>q.p==='GOL'&&!used.has(q.id)))).sort((a,b)=>eff(b,s.r)-eff(a,s.r))[0];if(c){used.add(c.id);out.push([s,c])}};
     const rest=[];slots.forEach(s=>{const n=out.length;pickFor(s,true);if(out.length===n)rest.push(s)});rest.forEach(s=>pickFor(s,false));
-    out.forEach(([s,p])=>{const e=on.find(o=>o[1]===p.id);e[0]=s.r;m.posMe[p.id]={x:s.x,y:s.y}});m.dirty=true;MS.selOut=MS.selIn=null;toast(`Time reorganizado no ${v}.`);renderMatch()},
+    out.forEach(([s,p])=>{const e=on.find(o=>o[1]===p.id);e[0]=s.r;m.posMe[p.id]={x:s.x,y:s.y}});m.dirty=true;MS.selOut=MS.selIn=null;toast(on.length<11?`Time reorganizado no ${v}, com ${on.length} em campo.`:`Time reorganizado no ${v}.`);renderMatch()},
   mtac:v=>{MS.mine.tac[S.me]=v;MS.mine.dirty=true;S.lineup.tac=v;renderMatch()},
   sout:v=>{MS.selOut=MS.selOut===+v?null:+v;renderMatch()},
   sin:v=>{MS.selIn=MS.selIn===+v?null:+v;renderMatch()},
