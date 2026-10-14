@@ -767,6 +767,8 @@ const GRPL={G:'Goleiros',D:'Defesa',M:'Meio-campo',A:'Ataque'};
 /* ===== camada Elifoot: força 1–50, posição G/D/M/A, craque (*) e comportamento ===== */
 /* estaduais fora do jogo: vagas na Série D, Copa do Brasil e copas regionais saem do ranking de força de cada estado */
 const NOEST=true;
+/* copas regionais (Nordeste, Sul-Sudeste, Verde) fora do jogo */
+const NOREG=true;
 /* Série D com 20 clubes em pontos corridos, como as outras séries */
 const D20F=true;
 const D20=()=>INIT.Dg.flat().slice().sort((a,b)=>(STARTPW[b]||0)-(STARTPW[a]||0)).slice(0,20);
@@ -983,7 +985,7 @@ function buildComps(P){
   C.CB=makeComp('CB',[cbSpec(P)]);
   const lib=g=>[rrSpec(g,2),koSpec(16,n=>n>2?2:1,'seed',{k:'grp',size:16})];
   C.LIB=makeComp('LIB',lib(P.LIBg));C.SUD=makeComp('SUD',lib(P.SUDg));
-  for(const r of ['NE','SSE','VER'])C[r]=makeComp(r,[rrSpec(P[r+'g'],1),koSpec(8,n=>n>2?1:2,'seed',{k:'grp',size:8})]);
+  if(!NOREG)for(const r of ['NE','SSE','VER'])C[r]=makeComp(r,[rrSpec(P[r+'g'],1),koSpec(8,n=>n>2?1:2,'seed',{k:'grp',size:8})]);
   if(NOEST)for(const u in {}){}else for(const u in P.ST){const ids=P.ST[u];if(ids.length<4)continue;const g=ids.length>12?snakeGroups(ids,2):[ids];C['E-'+u]=makeComp('E-'+u,[rrSpec(g,1),koSpec(4,n=>n>2?1:2,'seed',{k:'grp',size:4})])}
   for(const u in P.EX){const ids=P.EX[u];C['X-'+u]=makeComp('X-'+u,[rrSpec([ids],ids.length<=20?2:1)])}
   return C;
@@ -1188,7 +1190,7 @@ function initQuotas(){
   return{D:qD,CB:quotaOf(INIT.CB.filter(id=>!ab.has(id))),NE:quotaOf(INIT.NEg.flat()),SSE:quotaOf(INIT.SSEg.flat()),VER:quotaOf(INIT.VERg.flat()),G:{NE:INIT.NEg.length,SSE:INIT.SSEg.length,VER:INIT.VERg.length}};
 }
 function newGame(tid,coach){
-  S={v:5,noest:1,season:2026,me:tid,coach:coach||'Técnico',teams:{},players:[],nextId:1,news:[],hist:[],inbox:[],auctions:[],sat:60,coachPool:[],finS:{},triedC:{},tried:{},fired:null,fin:null,
+  S={v:5,noest:1,noreg:1,season:2026,me:tid,coach:coach||'Técnico',teams:{},players:[],nextId:1,news:[],hist:[],inbox:[],auctions:[],sat:60,coachPool:[],finS:{},triedC:{},tried:{},fired:null,fin:null,
     lineup:{form:'4-2-3-1',tac:'equ',xi:[],pos:presetPos('4-2-3-1')},d:0,cal:[],comps:{},my:[],titles:[],mon:null,P:null,quota:initQuotas()};
   TEAMS.forEach(([id,name,code,c1,c2,cap,st,city,coach,reg,rep])=>{
     const t={id,name,code,c1,c2,rep,cap,reg,stad:st,city,coach:coach||'Interino',cash:+(2+rep*rep/100*.7).toFixed(1),form:AIFORMS[(+id)%4],last:[],mp:0,div:STN[reg]?'E':'X',main:null,gm:0,gbox:0,gpub:0,ghome:0};
@@ -2174,6 +2176,7 @@ function useState(obj){
   S.auctions=S.auctions||[];S.coachPool=S.coachPool||[];S.finS=S.finS||{};S.triedC=S.triedC||{};S.tried=S.tried||{};if(S.fired===undefined)S.fired=null;
   if(!S.lineup.pos||S.lineup.pos.length!==11||!S.lineup.xi||S.lineup.xi.length!==11){S.lineup.form='4-2-3-1';S.lineup.pos=presetPos('4-2-3-1');S.lineup.xi=elPick(S.me,"4-4-2")}
   S.lineup.pos=S.lineup.pos.map(q=>snap(q.x,q.y));
+  if(NOREG&&!S.noreg){['NE','SSE','VER'].forEach(k=>delete S.comps[k]);S.noreg=1}
   if(NOEST&&!S.noest){Object.keys(S.comps).filter(k=>k.startsWith('E-')).forEach(k=>delete S.comps[k]);Object.values(S.teams).forEach(t=>{if(t.main&&String(t.main).startsWith('E-'))t.main=null});S.noest=1}
   if(!S.gems){seedGems();S.gems=1;save()}
   if(!S.wfix){S.players.forEach(p=>{if(p.t)p.w=baseWage(p)*(.9+R()*.2)});S.wfix=1}
@@ -2573,8 +2576,8 @@ function renderOpcoes(){
   return `
   <div class="card"><div class="card-h"><h3>Copas em que você caiu</h3><button class="btn sm ${S.spect===false?'':'on'}" data-a="spon">${S.spect===false?'Desligado':'Ligado'}</button></div><p class="small">Quando ligado, as rodadas das copas em que você foi eliminado param para você assistir (ou simular).</p></div>
   <div class="card"><h3>Calendário da temporada</h3>
-    <p class="small">Janeiro a abril: copas regionais (Nordeste, Sul-Sudeste, Verde) e as primeiras fases da Copa do Brasil no meio de semana. De maio a dezembro: Séries A a D e as ligas sul-americanas, intercaladas com Libertadores, Sul-Americana e o mata-mata da Copa do Brasil.</p>
-    <p class="small">Fim de temporada: 4 sobem e 4 caem entre A, B e C. Na Série C, os 8 primeiros fazem dois quadrangulares (os 2 de cada sobem). Na Série D, os semifinalistas sobem; as vagas restantes da Série D, da Copa do Brasil e das copas regionais vão para os clubes mais fortes de cada estado (não há estaduais). Vagas continentais: 6 brasileiros na Libertadores (campeão da Copa do Brasil e os melhores da Série A) e os 6 seguintes na Sul-Americana; campeões continentais têm vaga garantida.</p></div>
+    <p class="small">As Séries A a D (20 clubes cada, 38 rodadas) e as ligas sul-americanas começam em janeiro, aos domingos. No meio de semana: Copa do Brasil, Libertadores e Sul-Americana.</p>
+    <p class="small">Fim de temporada: 4 sobem e 4 caem entre A, B e C. Na Série C, os 8 primeiros fazem dois quadrangulares (os 2 de cada sobem). Na Série D, os 4 primeiros sobem e os 4 últimos saem das séries, dando lugar aos 4 clubes mais fortes de fora. As vagas da Copa do Brasil fora das Séries A e B vão para os clubes mais fortes de cada estado. Vagas continentais: 6 brasileiros na Libertadores (campeão da Copa do Brasil e os melhores da Série A) e os 6 seguintes na Sul-Americana; campeões continentais têm vaga garantida.</p></div>
   <div class="card"><h3>Funções e improviso</h3>
     <p class="small">Cada jogador tem uma função principal e, às vezes, uma secundária: ${ROLES.map(r=>`<b>${r}</b> ${RN[r].toLowerCase()}`).join(', ')}.</p>
     <p class="small">Fora da função ele perde força. Na secundária perde 1 ponto. Em função vizinha perde 2 a 5. Em outro setor perde 7 a 12, e um jogador de linha no gol perde 30.</p></div>
@@ -3709,6 +3712,6 @@ function stIcons(p){return (p.sus?'<i class="sti">🟥</i>':'')+(p.inj?`<i class
 ACT.mev=()=>{MS.showEv=!MS.showEv;renderMatch()};
 
 </script>
-<script>const APPV="43";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="44";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
