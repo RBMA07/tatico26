@@ -353,6 +353,10 @@ label select{display:block;width:100%;margin-top:6px}
 .calr .op{display:flex;align-items:center;gap:6px;min-width:0;font-size:14px;font-weight:600}
 .calr .op span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kv>span:last-child,.kv>b:last-child{white-space:nowrap}
+.mspot{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;border:2px dashed rgba(255,255,255,.75);background:rgba(255,255,255,.12);color:#fff;padding:0;display:grid;place-items:center;z-index:2;cursor:pointer}
+.mspot span{font-size:8px;font-weight:700;letter-spacing:.02em}
+#match .chipb.mchip{background:#0b1825;color:#e8f0f7;border-color:#3a5670}
+#match .seg{margin-top:8px}
 
 </style>
 
@@ -839,7 +843,7 @@ function strength(on){
 }
 const homeAdv=occ=>1.06+.24*occ, awayAdv=occ=>.95-.1*occ;
 /* diferença de força com retorno decrescente: um gigante segue favorito contra um distrital, mas zebra existe */
-const soft=d=>{const a=Math.abs(d);return Math.sign(d)*(a<=8?a:8+(a-8)*.35)};
+const soft=d=>{const a=Math.abs(d);return Math.sign(d)*(a<=8?a:8+(a-8)*.6)};
 function lam(x,y,adv,tx,ty){return clamp(.93*Math.exp(soft(x.att-y.def)/13)*(x.sa/y.sd)*adv*TAC[tx].own*TAC[ty].opp,.12,5)}
 /* importância do jogo: decisão enche o estádio, estadual no começo do ano nem tanto */
 function impOf(c){
@@ -2049,11 +2053,13 @@ function renderMatch(){
     const selRole=MS.selOut?(on.find(x=>x[1]===MS.selOut)||[])[0]:m.gap[me][0];
     const b=bench(m,me).sort((x,y)=>selRole?eff(y,selRole)-eff(x,selRole):y.o-x.o);
     const tm=T(me);const bg=bgOf(tm),fg=fgOn(bg);const RXY={GOL:[50,90],ZAG:[50,74],LD:[88,74],LE:[12,74],VOL:[50,57],MEI:[50,44],MOF:[50,31],PD:[88,31],PE:[12,31],CA:[50,14]};
-    const fld=`<div class="field mf">${'<div class="mid"></div><div class="ccl"></div><div class="box t"></div><div class="box b"></div>'}${m.on[me].map(([r,id])=>{const p=P(id);const q=m.posMe[id]||{x:RXY[r][0],y:RXY[r][1]};const pn=penP(p,r);return `<button class="slot mslot ${pn>1?'off':''} ${MS.selOut===id?'sel':''}" style="left:${q.x}%;top:${q.y}%" data-a="sout" data-v="${id}" aria-label="${r}: ${esc(p.n)}"><i style="background:${bg};color:${fg}">${p.o}${pn>1?`<em>−${pn}</em>`:''}</i><b>${r}</b><span>${esc(p.n.split(' ').slice(-1)[0])}</span></button>`}).join('')}${m.gapPos.map(q=>`<div class="slot empty" style="left:${q.x}%;top:${q.y}%"><i>+</i><b>VAGA</b><span>lesão</span></div>`).join('')}</div>`;
+    const fld=`<div class="field mf">${'<div class="mid"></div><div class="ccl"></div><div class="box t"></div><div class="box b"></div>'}${m.on[me].map(([r,id])=>{const p=P(id);const q=m.posMe[id]||{x:RXY[r][0],y:RXY[r][1]};const pn=penP(p,r);return `<button class="slot mslot ${pn>1?'off':''} ${MS.selOut===id?'sel':''}" style="left:${q.x}%;top:${q.y}%" data-a="sout" data-v="${id}" aria-label="${r}: ${esc(p.n)}"><i style="background:${bg};color:${fg}">${p.o}${pn>1?`<em>−${pn}</em>`:''}</i><b>${r}</b><span>${esc(p.n.split(' ').slice(-1)[0])}</span></button>`}).join('')}${m.gapPos.map(q=>`<div class="slot empty" style="left:${q.x}%;top:${q.y}%"><i>+</i><b>VAGA</b><span>lesão</span></div>`).join('')}${MS.selOut&&!MS.selIn?SPOTS.filter(s=>!m.on[me].some(([r,id])=>{const q=m.posMe[id]||{x:RXY[r][0],y:RXY[r][1]};return q.x===s.x&&q.y===s.y})).map(s=>`<button class="mspot" style="left:${s.x}%;top:${s.y}%" data-a="mspot" data-v="${s.x},${s.y}" aria-label="Mover para ${zoneRole(s.x,s.y)}"><span>${zoneRole(s.x,s.y)}</span></button>`).join(''):''}</div>`;
     const itB=p=>`<button class="bb mb ${MS.selIn===p.id?'sel':''}" data-a="sin" data-v="${p.id}" aria-label="${esc(p.n)}"><i style="background:${bg};color:${fg}">${selRole?eff(p,selRole):p.o}</i><b>${p.p}</b><span>${esc(p.n.split(' ').slice(-1)[0])}</span></button>`;
     panel=`<div class="mcard"><h3>Ajustes · trocas ${m.subs[me]}/5</h3>
       <div class="seg">${Object.entries(TAC).map(([k,v])=>`<button class="${m.tac[me]===k?'on':''}" data-a="mtac" data-v="${k}">${v.n}</button>`).join('')}</div>
-      <p class="tiny" style="color:var(--m-mute)">1. Toque em quem sai no campo · 2. Toque em quem entra no banco${selRole?` (força como ${selRole})`:''} · 3. Confirme</p>
+      <p class="tiny" style="color:var(--m-mute);font-weight:700">ESQUEMA</p>
+      <div class="roles">${Object.keys(FORMS).map(f=>`<button class="chipb mchip" data-a="mform" data-v="${f}">${f}</button>`).join('')}</div>
+      <p class="tiny" style="color:var(--m-mute)">Mudar posição: toque no jogador e depois num círculo vazio do campo (a função muda conforme a zona). Trocar: toque em quem sai, depois em quem entra no banco${selRole?` (força como ${selRole})`:''} e confirme.</p>
       ${fld}
       <p class="tiny" style="color:var(--m-mute);font-weight:700">BANCO</p>
       <div class="benchrow">${b.map(itB).join('')||'<span class="tiny" style="color:var(--m-mute)">Banco vazio</span>'}</div>
@@ -2069,9 +2075,10 @@ function renderMatch(){
       <div class="col" style="display:flex;flex-direction:column;gap:6px">${list.map(x=>`<button class="it pk" data-a="pentk" data-v="${x.p.id}">${rpill(x.r)}<span>${esc(x.p.n)}</span><b>${Math.round(x.c*100)}%</b></button>`).join('')}</div></div>`;
   }
   const ctrl=MS.done?`<button class="btn pri big" data-a="mclose">Continuar</button>`:MS.pen?'':
-    `<div class="row">${MS.paused?`<button class="btn pri grow" data-a="mresume">${m.min===45&&MS.half?'▶ 2º tempo':'▶ Retomar'}</button>`:`<button class="btn grow" data-a="mpause">❚❚ Pausar e substituir</button>`}
+    `<div class="row">${MS.paused?`<button class="btn pri grow" data-a="mresume">${m.min===45&&MS.half?'▶ 2º tempo':'▶ Retomar'}</button>`:`<button class="btn grow" data-a="mpause">❚❚ Pausar: esquema e trocas</button>`}
      <button class="btn ${MS.speed>1?'on':''}" data-a="mspeed" aria-label="Velocidade">${MS.speed}×</button>
-     <button class="btn" data-a="mskip">Fim ⏭</button></div>`;
+     <button class="btn" data-a="mskip">Fim ⏭</button></div>
+     ${MS.paused?'':`<div class="seg">${Object.entries(TAC).map(([k,v])=>`<button class="${m.tac[me]===k?'on':''}" data-a="mtac" data-v="${k}">${v.n}</button>`).join('')}</div>`}`;
   let endCard='';
   if(MS.done){
     const ga=groupAfter(c,MS.ms);
@@ -2185,6 +2192,14 @@ const ACT={
   mspeed:()=>{MS.speed=MS.speed===1?2:MS.speed===2?4:1;runClock();renderMatch()},
   pentk:v=>{const m=MS.mine;const ok=resolvePen(m,S.me,+v);MS.pen=null;toast(ok?'GOL! Pênalti convertido.':'Perdeu o pênalti!');MS.paused=false;runClock();renderMatch()},
   mskip:()=>skipToEnd(),
+  mspot:v=>{const m=MS.mine,me=S.me;const [x,y]=v.split(',').map(Number);const e=m.on[me].find(o=>o[1]===MS.selOut);if(!e)return;const r=zoneRole(x,y);
+    if(r==='GOL'&&m.on[me].some(o=>o[0]==='GOL'&&o!==e))return toast('Já há um goleiro em campo.');
+    m.posMe[e[1]]={x,y};e[0]=r;m.dirty=true;MS.selOut=null;toast(`${P(e[1]).n} agora joga como ${RN[r].toLowerCase()}.`);renderMatch()},
+  mform:v=>{const m=MS.mine,me=S.me;const on=m.on[me];if(on.length!==11)return toast('Com jogador a menos, ajuste as posições uma a uma.');
+    const slots=FORMS[v].map(([r,x,y])=>({r,x,y}));const pool=on.map(o=>P(o[1]));const used=new Set();const out=[];
+    const pickFor=(s,nat)=>{const c=pool.filter(p=>!used.has(p.id)&&(!nat||penP(p,s.r)<=1)&&(s.r!=='GOL'||p.p==='GOL'||!pool.some(q=>q.p==='GOL'&&!used.has(q.id)))).sort((a,b)=>eff(b,s.r)-eff(a,s.r))[0];if(c){used.add(c.id);out.push([s,c])}};
+    const rest=[];slots.forEach(s=>{const n=out.length;pickFor(s,true);if(out.length===n)rest.push(s)});rest.forEach(s=>pickFor(s,false));
+    out.forEach(([s,p])=>{const e=on.find(o=>o[1]===p.id);e[0]=s.r;m.posMe[p.id]={x:s.x,y:s.y}});m.dirty=true;MS.selOut=MS.selIn=null;toast(`Time reorganizado no ${v}.`);renderMatch()},
   mtac:v=>{MS.mine.tac[S.me]=v;MS.mine.dirty=true;S.lineup.tac=v;renderMatch()},
   sout:v=>{MS.selOut=MS.selOut===+v?null:+v;renderMatch()},
   sin:v=>{MS.selIn=MS.selIn===+v?null:+v;renderMatch()},
