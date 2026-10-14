@@ -1752,24 +1752,36 @@ let CRESTS={};try{CRESTS=JSON.parse(localStorage.getItem('tatico26.crests')||'{}
 (()=>{let ch=false;Object.entries(OLDCODES).forEach(([k,id])=>{if(CRESTS[k]&&!CRESTS[id]){CRESTS[id]=CRESTS[k];ch=true}if(CRESTS[k]){delete CRESTS[k];ch=true}});if(ch)try{localStorage.setItem('tatico26.crests',JSON.stringify(CRESTS))}catch(e){}})();
 function saveCrests(){try{localStorage.setItem('tatico26.crests',JSON.stringify(CRESTS));return true}catch(e){toast('Sem espaço neste navegador para guardar o escudo.');return false}}
 const SHIELD='M20 2 L37 7 V22 C37 33 29 40 20 44 C11 40 3 33 3 22 V7 Z';
-/* bola nas cores do clube: pentágono central na 1ª cor, gomos da borda alternando 1ª e 3ª, fundo na 2ª */
-const C3={1955:'#e3262f',1961:'#00663e',1976:'#ffffff',1981:'#111111',1987:'#ffffff',2005:'#ffd200',2020:'#ffffff',5926:'#ffffff',6980:'#d52b1e',2025:'#ffffff',2009:'#ffffff'};
-const BALLG=(()=>{const cx=20,cy=23,P=(r,a)=>[cx+r*Math.sin(a),cy-r*Math.cos(a)],d2r=Math.PI/180;
-  const pent=(x,y,r,rot)=>Array.from({length:5},(_,i)=>{const a=(rot+i*72)*d2r;return [x+r*Math.sin(a),y-r*Math.cos(a)]});
-  const f=pts=>'M'+pts.map(p=>p.map(v=>v.toFixed(2)).join(' ')).join('L')+'Z';
-  const center=pent(cx,cy,6.2,0);
-  const edges=Array.from({length:5},(_,i)=>{const a=(36+i*72);const [x,y]=P(16.6,a*d2r);return f(pent(x,y,6,a+180))});
-  const seams=center.map((p,i)=>{const a=i*72*d2r;const q=P(11.5,a);return `M${p[0].toFixed(2)} ${p[1].toFixed(2)}L${q[0].toFixed(2)} ${q[1].toFixed(2)}`}).join('')+
-    Array.from({length:5},(_,i)=>{const a=i*72*d2r;const q=P(11.5,a),l=P(13.6,a-22*d2r),r=P(13.6,a+22*d2r);return `M${l[0].toFixed(2)} ${l[1].toFixed(2)}L${q[0].toFixed(2)} ${q[1].toFixed(2)}L${r[0].toFixed(2)} ${r[1].toFixed(2)}`}).join('');
-  return {center:f(center),edges,seams};
-})();
+/* bola listrada nas cores do clube (estilo Elifoot): listras verticais, horizontais ou faixa diagonal */
+const W_='#ffffff',K_='#111111';
+const STRIPES={
+ 1955:['h',['#0057a8',W_,'#e3262f',W_,'#0057a8']],5981:['h',['#c8102e',K_,'#c8102e',K_,'#c8102e']],1958:['v',[K_,W_,K_,W_,K_]],1977:['v',[K_,W_,K_,W_,K_]],
+ 1974:['d',[K_,K_,W_,K_,K_]],1969:['d',[W_,W_,K_,W_,W_]],1959:['h',['#cc0000',K_,'#cc0000',K_,'#cc0000']],1962:['h',['#d4141c',K_,'#d4141c',K_,'#d4141c']],
+ 1967:['h',['#c8102e',K_,'#c8102e',K_,'#c8102e']],1961:['v',['#7a1335',W_,'#00663e',W_,'#7a1335']],1981:['h',[W_,'#d40000',W_,K_,W_]],
+ 5926:['v',['#0d80bf',K_,W_,K_,'#0d80bf']],1968:['v',[W_,K_,W_,K_,W_]],2020:['h',['#d6172b',W_,'#0000ff',W_,'#d6172b']],1976:['h',[K_,W_,'#ff0000',W_,K_]],
+ 1980:['v',['#006600',W_,'#006600',W_,'#006600']],2001:['v',[K_,W_,K_,W_,K_]],1985:['v',[K_,W_,K_,W_,K_]],2011:['v',['#ff3300',W_,'#ff3300',W_,'#ff3300']],
+ 22032:['h',['#f20000',W_,'#f20000',W_,'#f20000']],1984:['v',['#ffd200',K_,'#ffd200',K_,'#ffd200']],1997:['h',['#3333ff',W_,'#3333ff',W_,'#3333ff']],
+ 7315:['h',['#0066ff',W_,'#0066ff',W_,'#0066ff']],1982:['h',['#00693e',W_,'#00693e',W_,'#00693e']],1979:['v',['#ff0000',W_,'#ff0000',W_,'#ff0000']],
+ 1957:['h',[W_,W_,K_,W_,W_]],1963:['h',['#006437','#006437',W_,'#006437','#006437']],1966:['h',['#e30613','#e30613',W_,'#e30613','#e30613']],
+ 1954:['h',['#0039a6','#0039a6',W_,'#0039a6','#0039a6']],2005:['h',['#008000','#ffd200','#ff0000','#ffd200','#008000']],1987:['v',['#cc0000',K_,W_,K_,'#cc0000']],
+ 6980:['h',['#002570','#ffcd00','#d52b1e','#ffcd00','#002570']]
+};
+function stripeSpec(t){
+  if(STRIPES[t.id])return STRIPES[t.id];
+  let c1=t.c1,c2=t.c2;const near=(a,b)=>Math.abs(lum(a)-lum(b))<.08&&a.slice(1,3)===b.slice(1,3)||a.toLowerCase()===b.toLowerCase();
+  if(near(c1,c2)||Math.abs(lum(c1)-lum(c2))<.05)c2=lum(c1)>.6?K_:W_;
+  let h=0;for(const ch of String(t.id))h=(h*31+ch.charCodeAt(0))%1009;
+  const k=h%10;
+  if(k<4)return ['v',[c1,c2,c1,c2,c1]];
+  if(k<8)return ['h',[c1,c2,c1,c2,c1]];
+  return ['h',[c1,c1,c2,c1,c1]];
+}
 function ballSVG(t,s){
-  const c1=t.c1,c2=t.c2,c3=C3[t.id]||c1;const ln=lum(c2)>.6?'rgba(0,0,0,.35)':'rgba(255,255,255,.4)';
-  const uid='bc'+t.id;
-  return `<svg class="shield ball" viewBox="0 0 40 46" style="width:${s}px;height:${Math.round(s*1.15)}px" role="img" aria-label="${esc(t.name)}"><defs><clipPath id="${uid}"><circle cx="20" cy="23" r="17.4"/></clipPath><radialGradient id="${uid}g" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></radialGradient></defs>
-    <circle cx="20" cy="23" r="18" fill="${c2}" stroke="rgba(0,0,0,.35)" stroke-width="1.2"/>
-    <g clip-path="url(#${uid})"><path d="${BALLG.center}" fill="${c1}" stroke="${ln}" stroke-width=".7"/>${BALLG.edges.map((d,i)=>`<path d="${d}" fill="${i%2?c3:c1}" stroke="${ln}" stroke-width=".7"/>`).join('')}<path d="${BALLG.seams}" fill="none" stroke="${ln}" stroke-width=".8"/></g>
-    <circle cx="20" cy="23" r="17.4" fill="url(#${uid}g)"/></svg>`;
+  const [d,cols]=stripeSpec(t);const uid='bl'+t.id;const n=cols.length,w=36/n;
+  const bands=cols.map((c,i)=>d==='v'?`<rect x="${(2+i*w).toFixed(2)}" y="3" width="${(w+.3).toFixed(2)}" height="40" fill="${c}"/>`:`<rect x="-6" y="${(5+i*w).toFixed(2)}" width="52" height="${(w+.3).toFixed(2)}" fill="${c}"/>`).join('');
+  const g=d==='d'?`<g transform="rotate(-40 20 23)">${bands}</g>`:bands;
+  return `<svg class="shield ball" viewBox="0 0 40 46" style="width:${s}px;height:${Math.round(s*1.15)}px" role="img" aria-label="${esc(t.name)}"><defs><clipPath id="${uid}"><circle cx="20" cy="23" r="18"/></clipPath><radialGradient id="${uid}g" cx="34%" cy="28%" r="80%"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".32"/></radialGradient></defs>
+    <g clip-path="url(#${uid})">${g}</g><circle cx="20" cy="23" r="18" fill="url(#${uid}g)" stroke="rgba(0,0,0,.4)" stroke-width="1.2"/></svg>`;
 }
 const crest=(id,s=36)=>{
   const t=id?((S&&S.teams[id])||TMETA[id]):null;
@@ -2798,6 +2810,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="22";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="23";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
