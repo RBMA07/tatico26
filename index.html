@@ -448,6 +448,12 @@ tr.tlink:active td{background:var(--accent-soft)}
 .slotn{width:24px;height:24px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.8rem;flex:none}
 .svslot.empty .slotn{opacity:.5}
 .svslot .grow p{margin:0}
+/* filtros do mercado */
+.mfil{display:flex;flex-direction:column;gap:8px;padding:12px 14px}
+.mfr{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mfr>span{width:96px;font-size:.85rem;font-weight:700;color:var(--mute)}
+.mfr input{width:74px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--surface);color:inherit}
+.mfr i{font-style:normal;color:var(--mute);font-size:.85rem}
 
 </style>
 
@@ -1742,15 +1748,33 @@ function metaOf(o){return {me:o.me,name:(o.teams[o.me]||{}).name||'',coach:o.coa
 function slotInfo(n){
   let has=false;try{has=!!localStorage.getItem(keyOf(n))}catch(e){}
   if(!has)return null;const m=slotMeta()[n];if(m)return m;
+  let s0='';try{s0=localStorage.getItem(keyOf(n))||''}catch(e){}if(s0[0]==='D')return {me:null,name:'Jogo salvo',coach:'',season:'',dt:''};
   const o=loadSaved(n);if(!o)return {broken:true};const mm=metaOf(o);setMeta(n,mm);return mm;
 }
+/* compressão nativa do navegador (deflate) roda fora da tela: salvar não trava mais o jogo.
+   bytes → texto em blocos de 15 bits (mesma ideia do LZString, sem caracteres inválidos) */
+const HASCS=typeof CompressionStream!=='undefined'&&typeof DecompressionStream!=='undefined';
+function b2s(u){let out='',acc=0,n=0;const parts=[];for(let i=0;i<u.length;i++){acc=(acc<<8)|u[i];n+=8;while(n>=15){n-=15;out+=String.fromCharCode(((acc>>n)&0x7fff)+32);if(out.length>8192){parts.push(out);out=''}}acc&=(1<<n)-1}
+  if(n>0)out+=String.fromCharCode(((acc<<(15-n))&0x7fff)+32);parts.push(out);return parts.join('')}
+function s2b(s,len){const u=new Uint8Array(len);let acc=0,n=0,j=0;for(let i=0;i<s.length&&j<len;i++){acc=(acc<<15)|(s.charCodeAt(i)-32);n+=15;while(n>=8&&j<len){n-=8;u[j++]=(acc>>n)&255}acc&=(1<<n)-1}return u}
+async function deflateTxt(txt){const buf=await new Response(new Blob([txt]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer();const u=new Uint8Array(buf);return 'D'+u.length+':'+b2s(u)}
+async function inflateTxt(s){const i=s.indexOf(':');const len=+s.slice(1,i);const u=s2b(s.slice(i+1),len);return await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text()}
+let SAVING=false,SAVEAGAIN=false;
 function save(){
   if(!S)return;
-  try{const raw=packS();const z=LZ();localStorage.setItem(keyOf(SLOT),z?'Z'+z.compressToUTF16(raw):'J'+raw);setMeta(SLOT,metaOf(S))}
-  catch(e){toast('Não foi possível salvar: armazenamento do navegador cheio. Apague um dos jogos salvos.')}
+  if(SAVING){SAVEAGAIN=true;return}
+  let raw;try{raw=packS()}catch(e){return}
+  const slot=SLOT,meta=metaOf(S);
+  const put=v=>{try{localStorage.setItem(keyOf(slot),v);setMeta(slot,meta)}catch(e){toast('Não foi possível salvar: armazenamento do navegador cheio. Apague um dos jogos salvos.')}};
+  if(!HASCS){setTimeout(()=>{const z=LZ();put(z?'Z'+z.compressToUTF16(raw):'J'+raw)},0);return}
+  SAVING=true;
+  deflateTxt(raw).then(put).catch(()=>{const z=LZ();put(z?'Z'+z.compressToUTF16(raw):'J'+raw)}).finally(()=>{SAVING=false;if(SAVEAGAIN){SAVEAGAIN=false;save()}});
 }
-function loadRaw(n=SLOT){try{const s=localStorage.getItem(keyOf(n));if(!s)return null;if(s[0]==='Z'){const z=LZ();if(!z)return null;return z.decompressFromUTF16(s.slice(1))}return s.slice(1)}catch(e){return null}}
+/* salva já, de forma síncrona (ao fechar/ocultar o app) */
+function saveNow(){if(!S)return;try{const raw=packS();const z=LZ();localStorage.setItem(keyOf(SLOT),z?'Z'+z.compressToUTF16(raw):'J'+raw);setMeta(SLOT,metaOf(S))}catch(e){}}
+function loadRaw(n=SLOT){try{const s=localStorage.getItem(keyOf(n));if(!s)return null;if(s[0]==='Z'){const z=LZ();if(!z)return null;return z.decompressFromUTF16(s.slice(1))}if(s[0]==='D')return null;return s.slice(1)}catch(e){return null}}
 function loadSaved(n=SLOT){try{const r=loadRaw(n);return r?unpackS(r):null}catch(e){return null}}
+async function loadSavedAsync(n=SLOT){const s=localStorage.getItem(keyOf(n));if(!s)return null;if(s[0]==='D')return unpackS(await inflateTxt(s));return loadSaved(n)}
 function delSlot(n){try{localStorage.removeItem(keyOf(n))}catch(e){}setMeta(n,null)}
 function hasOldSave(){try{return !!localStorage.getItem(OLDKEY)}catch(e){return false}}
 function useState(obj){
@@ -2100,7 +2124,10 @@ function marketList(){
   const q=UI.mq.trim().toLowerCase();
   const k={o:p=>-p.o,pot:p=>-p.pot,a:p=>p.a,$:p=>ask(p)}[UI.msort];
   const pool=UI.mfree?(SQ.get(null)||[]):S.players;
-  let list=pool.filter(p=>p.t!==S.me&&(UI.mfree?p.t===null:p.t!==null)&&(UI.mpos==='T'||p.p===UI.mpos||p.p2===UI.mpos)&&(!q||p.n.toLowerCase().includes(q)||(p.t&&T(p.t).name.toLowerCase().includes(q))));
+  const o1=+UI.mo1||0,o2=+UI.mo2||99,a2=+UI.ma2||99;let p1=+UI.mp1||0,p2=UI.mp2===''||UI.mp2==null?1e9:+UI.mp2;if(UI.mcash)p2=Math.min(p2,Math.max(0,T(S.me).cash));
+  let list=pool.filter(p=>p.t!==S.me&&(UI.mfree?p.t===null:p.t!==null)&&p.o>=o1&&p.o<=o2&&p.a<=a2&&(UI.mpos==='T'||p.p===UI.mpos||p.p2===UI.mpos)&&(!q||p.n.toLowerCase().includes(q)||(p.t&&T(p.t).name.toLowerCase().includes(q))));
+  /* preço: corte barato pelo valor (o pedido fica entre 1,05× e 1,35× o valor) e depois o preço exato */
+  if(p1>0||p2<1e9){list=list.filter(p=>{const v=value(p);return v*(p.t?1.35:.15)>=p1&&v*(p.t?1.05:.15)<=p2});if(list.length<=1500)list=list.filter(p=>{const a=ask(p);return a>=p1&&a<=p2})}
   /* pré-corte barato pela força antes de calcular preços (o preço consulta o elenco do vendedor) */
   if(UI.msort==='$')list=list.sort((a,b)=>value(a)-value(b)).slice(0,300);
   const key=new Map(list.map(p=>[p,k(p)]));
@@ -2114,6 +2141,9 @@ function renderMercado(){
   <div class="search">${ICONS.search}<input type="text" id="mq" data-in="mq" placeholder="Buscar jogador ou clube" value="${esc(UI.mq)}" aria-label="Buscar"></div>
   <div class="roles">${['T',...ROLES].map(k=>`<button class="chipb ${UI.mpos===k?'on':''}" data-a="mpos" data-v="${k}">${k==='T'?'Todas':k}</button>`).join('')}</div>
   <div class="chipset"><button class="chipb ${UI.mfree?'on':''}" data-a="mfree">Sem clube</button>${[['o','Maior força'],['pot','Potencial'],['a','Mais jovens'],['$','Mais baratos']].map(([k,n])=>`<button class="chipb ${UI.msort===k?'on':''}" data-a="msort" data-v="${k}">${n}</button>`).join('')}</div>
+  <div class="card mfil"><div class="mfr"><span>Força</span><input type="number" inputmode="numeric" min="30" max="99" placeholder="mín" data-in="mo1" value="${esc(UI.mo1||'')}" aria-label="Força mínima"><i>a</i><input type="number" inputmode="numeric" min="30" max="99" placeholder="máx" data-in="mo2" value="${esc(UI.mo2||'')}" aria-label="Força máxima"></div>
+    <div class="mfr"><span>Preço (R$ mi)</span><input type="number" inputmode="decimal" step="0.1" min="0" placeholder="de" data-in="mp1" value="${esc(UI.mp1||'')}" aria-label="Preço mínimo"><i>a</i><input type="number" inputmode="decimal" step="0.1" min="0" placeholder="até" data-in="mp2" value="${esc(UI.mp2||'')}" aria-label="Preço máximo"></div>
+    <div class="mfr"><span>Idade até</span><input type="number" inputmode="numeric" min="16" max="40" placeholder="—" data-in="ma2" value="${esc(UI.ma2||'')}" aria-label="Idade máxima"><button class="chipb ${UI.mcash?'on':''}" data-a="mcash">Cabe no caixa</button>${UI.mo1||UI.mo2||UI.mp1||UI.mp2||UI.ma2||UI.mcash?'<button class="chipb" data-a="mclr">Limpar</button>':''}</div></div>
   <div class="card"><div class="list" id="mlist">${mlistHTML()}</div></div>
   <p class="hint">Busca entre os ${S.players.length.toLocaleString('pt-BR')} jogadores do Brasil e da América do Sul. O filtro de função inclui quem tem aquela função como secundária. Titulares do clube vendedor custam 35% a mais.</p>`;
 }
@@ -2611,7 +2641,9 @@ const ACT={
   tab:v=>{UI.tab=v;UI.confirm=null;render();$('#main').scrollTop=0},
   pick:v=>{const n=UI.ns||SLOT;const m=slotInfo(n);if(m&&!m.broken&&UI.confirm!=='pick'+n+v){UI.confirm='pick'+n+v;toast(`O espaço ${n} tem o jogo do ${m.name}. Toque no clube de novo para substituir, ou escolha outro espaço.`);return}UI.confirm=null;setSlot(n);toast('Montando o mundo do futebol…');setTimeout(()=>{newGame(v,($('#coach')?.value||'').trim());UI.tab='clube';UI.tc=null;render()},30)},
   pk:v=>{UI.pk=v;UI.cq='';render()},
-  continue:v=>{const n=+v||SLOT;try{useState(loadSaved(n));setSlot(n);render()}catch(e){toast('Save corrompido. Comece um novo jogo.')}},
+  continue:v=>{const n=+v||SLOT;toast('Carregando…');loadSavedAsync(n).then(o=>{useState(o);setSlot(n);render()}).catch(()=>toast('Save corrompido. Comece um novo jogo.'))},
+  mcash:()=>{UI.mcash=!UI.mcash;render()},
+  mclr:()=>{['mo1','mo2','mp1','mp2','ma2'].forEach(k=>UI[k]='');UI.mcash=false;render()},
   nslot:v=>{UI.ns=+v;UI.confirm=null;render()},
   tomenu:()=>{save();S=null;UI.confirm=null;UI.ns=null;closeSheet();render()},
   play:()=>{
@@ -2747,10 +2779,12 @@ document.addEventListener('change',e=>{
   };img.onerror=()=>toast('Não consegui ler essa imagem. Tente PNG ou JPG.');img.src=fr.result};
   fr.readAsDataURL(file);
 });
+let MFT=null;
 document.addEventListener('input',e=>{
   const k=e.target.dataset&&e.target.dataset.in;
   if(k==='price'&&S){const t=T(S.me);t.price=+e.target.value;const est=$('#pest');if(est)est.innerHTML=priceEst();return}
   if(k==='mq'){UI.mq=e.target.value;const l=$('#mlist');if(l)l.innerHTML=mlistHTML()}
+  if(['mo1','mo2','mp1','mp2','ma2'].includes(k)){UI[k]=e.target.value.replace(',','.');clearTimeout(MFT);MFT=setTimeout(()=>{const l=$('#mlist');if(l)l.innerHTML=mlistHTML()},250)}
   if(k==='crq'){UI.crq=e.target.value;const l=$('#cgrid');if(l)l.innerHTML=crestGrid()}
   if(k==='cq'){UI.cq=e.target.value;const pos=e.target.selectionStart;render();const i=$('#cq');if(i){i.focus();try{i.setSelectionRange(pos,pos)}catch(_){}}}
 });
@@ -2838,6 +2872,6 @@ window.claude?.hot?.snapshot?.(()=>({raw:S&&!MS?packS():null}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();
 
 </script>
-<script>const APPV="24";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="25";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
