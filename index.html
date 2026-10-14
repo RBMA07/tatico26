@@ -1708,7 +1708,15 @@ function renderBench(){
 function renderElenco(){
   const sq=squad(S.me);const n=xiFilled();
   const off=S.lineup.xi.map((id,i)=>id&&P(id)?penP(P(id),myRoles()[i]):0).filter(x=>x>1).length;
-  return `
+  const mf=UI.pre&&S.d<S.cal.length?myFixtureOn(S.d):null;if(!mf)UI.pre=false;
+  const pre=mf?`<section class="hero"><div class="bg" style="background:${heroBg(mf.h,mf.a)}"></div><div class="in">
+    <div class="row" style="justify-content:space-between"><span class="meta">${esc(mf.c.s)}</span><span class="meta">${dLabel(S.cal[S.d])}</span></div>
+    <h1 class="dt" style="font-size:clamp(20px,6vw,28px)">${esc(T(mf.h).name)} <span>x</span> ${esc(T(mf.a).name)}</h1>
+    <p class="tiny" style="text-align:center;opacity:.9">Confira a escalação abaixo e comece quando quiser.</p>
+    <button class="btn pri big" data-a="kick" ${n<11?'disabled':''}>▶ Começar partida</button>
+    <button class="btn" data-a="kickq" ${n<11?'disabled':''} style="background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35)">Simular sem assistir</button>
+  </div></section>`:'';
+  return `${pre}
   <div class="card">
     <div class="card-h"><h3>Quadro tático</h3><span class="pill">${formName()} · média ${xiAvg().toFixed(1)}</span></div>
     ${renderField()}
@@ -2139,7 +2147,14 @@ const ACT={
   pick:v=>{toast('Montando o mundo do futebol…');setTimeout(()=>{newGame(v,($('#coach')?.value||'').trim());UI.tab='clube';UI.tc=null;render()},30)},
   pk:v=>{UI.pk=v;UI.cq='';render()},
   continue:()=>{try{useState(loadSaved());render()}catch(e){toast('Save corrompido. Comece um novo jogo.')}},
-  play:()=>startRound(),
+  play:()=>{
+    if(fixMyXI())toast('Escalação ajustada: havia desfalques.');
+    const f=advanceToMine();save();
+    if(!f){render();return}
+    fixMyXI();UI.pre=true;UI.tab='elenco';render();$('#main').scrollTop=0;
+  },
+  kick:()=>{UI.pre=false;startRound()},
+  kickq:()=>{UI.pre=false;quickMine()},
   quick:()=>quickMine(),
   toend:()=>{toast('Simulando o restante da temporada…');setTimeout(simToSeasonEnd,30)},
   seecomp:v=>{UI.tc=v;UI.tab='tabela';UI.tt='class';render();$('#main').scrollTop=0},
