@@ -761,6 +761,7 @@ input::placeholder{color:#7fb38f}
 .ggrid .gr .gep{flex-basis:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .ggrid .gr .gep .ge{flex-basis:auto;padding-left:4px}
 .ggrid .gr .gep .ge+.ge{text-align:right;padding-right:4px;padding-left:0}
+.pstat b{font-size:1.05rem;white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word;line-height:1.15}
 
 </style>
 
@@ -2110,7 +2111,7 @@ function seasonEnd(){
   /* resumo */
   const myTitles=S.titles.filter(t=>t.season===S.season&&(t.club||S.me)===S.me);
   const art=S.players.filter(p=>p.t&&S.teams[p.t].div==='A').sort((a,b)=>b.g-a.g)[0];
-  const growth=squad(S.me).map(p=>({n:p.n,d:p.o-p.o0})).sort((a,b)=>b.d-a.d);
+  const growth=squad(S.me).map(p=>({n:p.n,d:FZ(p.o)-FZ(p.o0)})).sort((a,b)=>b.d-a.d);
   const moved=A1.includes(S.me)&&me.div==='B'?'Acesso à Série A!':B1.includes(S.me)&&me.div==='A'?'Rebaixado para a Série B.':B1.includes(S.me)&&me.div==='C'?'Acesso à Série B!':C1.includes(S.me)&&me.div==='B'?'Rebaixado para a Série C.':C1.includes(S.me)&&me.div==='D'?'Acesso à Série C!':D1.includes(S.me)&&me.div==='C'?'Rebaixado para a Série D.':D1.includes(S.me)&&me.div==='E'?'Classificado para a Série D!':me.div==='D'&&!D1.includes(S.me)&&!C1.includes(S.me)?`Sem vaga na Série D de ${S.season+1}: as vagas vêm do estadual${me.reg&&Rk['E-'+me.reg]&&Rk['E-'+me.reg].includes(S.me)?` e o clube terminou em ${Rk['E-'+me.reg].indexOf(S.me)+1}º no ${STN[me.reg]}`:''}. Volta a ser distrital.`:'';
   S.hist.push({season:S.season,club:S.me,div:me.div,comp:main?main.s:'—',pos,titles:myTitles.map(t=>t.n)});
   UI.summary={season:S.season,champs:['A','B','C','D','CB','LIB','SUD'].map(k=>[k,S.comps[k]&&S.comps[k].champ]).filter(x=>x[1]),pos,comp:main?main.s:'',tg,titles:myTitles.map(t=>t.n),art:art?`${art.n} (${art.g} gols)`:'-',best:growth.slice(0,3).filter(x=>x.d>0),moved,lib:LIB1.includes(S.me),sud:SUD1.includes(S.me),tabs:Object.fromEntries(['A','B','C','D'].filter(k=>S.comps[k]).map(k=>[k,finalTable(S.comps[k],Rk[k])]))};S.lastTabs={season:S.season,tabs:UI.summary.tabs};
@@ -2271,7 +2272,7 @@ const crest=(id,s=36)=>{
 const fAvg=v=>Math.max(1,(v-45)*50/45).toFixed(1);
 const ovr=o=>`<span class="ovr ${tier(o)}">${FZ(o)}</span>`;
 const rpill=r=>`<span class="pos ${GRP[r]}">${GRP[r]}</span>`;
-const trend=p=>{const d=p.o-p.o0;return d>0?`<span class="up">▲${d}</span>`:d<0?`<span class="dn">▼${-d}</span>`:''};
+const trend=p=>{const d=FZ(p.o)-FZ(p.o0);return d>0?`<span class="up">▲${d}</span>`:d<0?`<span class="dn">▼${-d}</span>`:''};
 const roleTxt=p=>GRPN[GRP[p.p]]+` (${RN[p.p].toLowerCase()})`;
 function spark(h){
   if(h.length<2)return '';const Wd=300,H=56,mn=Math.min(...h)-2,mx=Math.max(...h)+2;
@@ -2449,7 +2450,7 @@ function renderField(){
   const slots=S.lineup.pos.map((q,i)=>{const p=P(S.lineup.xi[i]);const r=rs[i];
     if(!p)return `<div class="slot empty" style="left:${q.x}%;top:${q.y}%" data-drag="slot" data-v="${i}" role="button" tabindex="0" aria-label="${r} vazio"><i>+</i><b>${r}</b><span>vazio</span></div>`;
     const pn=penP(p,r);
-    return `<div class="slot ${pn>1?'off':''}" style="left:${q.x}%;top:${q.y}%" data-drag="slot" data-v="${i}" role="button" tabindex="0" aria-label="${r}: ${esc(p.n)}, força ${p.o}"><i style="background:${bg};color:${fg}">${p.o}${pn>1?`<em>−${pn}</em>`:''}</i><b>${r}</b><span>${esc(p.n.split(' ').slice(-1)[0])}</span></div>`}).join('');
+    return `<div class="slot ${pn>1?'off':''}" style="left:${q.x}%;top:${q.y}%" data-drag="slot" data-v="${i}" role="button" tabindex="0" aria-label="${r}: ${esc(p.n)}, força ${FZ(p.o)}"><i style="background:${bg};color:${fg}">${p.o}${pn>1?`<em>−${pn}</em>`:''}</i><b>${r}</b><span>${esc(p.n.split(' ').slice(-1)[0])}</span></div>`}).join('');
   return `<div class="field" id="field"><div class="mid"></div><div class="ccl"></div><div class="box t"></div><div class="box b"></div>${guides}${slots}</div>`;
 }
 /* relacionados: no pré-jogo mostra só os 12 reservas que importam (1 goleiro + os melhores de linha) */
@@ -2461,7 +2462,7 @@ function benchList(short){
 function renderBench(short){
   const me=T(S.me);const bg=bgOf(me),fg=fgOn(bg);
   const b=benchList(short);
-  return `<div class="benchrow">${b.map(p=>`<div class="bb ${avail(p)?'':'out'}" data-drag="bench" data-pid="${p.id}" role="button" tabindex="0" aria-label="${esc(p.n)}, ${p.p}, força ${p.o}"><i style="background:${avail(p)?bg:'var(--line)'};color:${avail(p)?fg:'var(--mute)'}">${p.o}</i><b>${p.p}</b><span>${esc(p.n.split(' ').slice(-1)[0])}</span></div>`).join('')}</div>`;
+  return `<div class="benchrow">${b.map(p=>`<div class="bb ${avail(p)?'':'out'}" data-drag="bench" data-pid="${p.id}" role="button" tabindex="0" aria-label="${esc(p.n)}, ${p.p}, força ${FZ(p.o)}"><i style="background:${avail(p)?bg:'var(--line)'};color:${avail(p)?fg:'var(--mute)'}">${p.o}</i><b>${p.p}</b><span>${esc(p.n.split(' ').slice(-1)[0])}</span></div>`).join('')}</div>`;
 }
 function renderElenco(){
   const sq=squad(S.me);const n=xiFilled();
@@ -2844,7 +2845,7 @@ function openSlot(i){
   const nat=p=>penP(p,r)<=1?1:0;
   const list=squad(S.me).sort((a,b)=>(avail(b)-avail(a))||nat(b)-nat(a)||eff(b,r)-eff(a,r));
   const rec=list.find(p=>avail(p)&&nat(p));
-  const row=p=>{const j=S.lineup.xi.indexOf(p.id);const pn=penP(p,r);return `<button class="pick ${p.id===cur?'cur':''}" data-a="setslot" data-v="${i}:${p.id}" ${avail(p)?'':'disabled'}>${rpill(p.p)}<span class="info"><span class="nm">${esc(p.n)}${p===rec?' <span class="st-tag">Recomendado</span>':''}</span><span class="mt">${!avail(p)?(p.inj?'Lesionado':'Suspenso'):j>=0?'Titular em '+rs[j]:'Reserva'}${p.p2?' · também '+p.p2:''}</span></span><span class="effv"><b class="${pn>1?'dn':''}">${eff(p,r)}</b><small>${pn?`força ${p.o} −${pn}`:'na função'}</small></span></button>`};
+  const row=p=>{const j=S.lineup.xi.indexOf(p.id);const pn=penP(p,r);return `<button class="pick ${p.id===cur?'cur':''}" data-a="setslot" data-v="${i}:${p.id}" ${avail(p)?'':'disabled'}>${rpill(p.p)}<span class="info"><span class="nm">${esc(p.n)}${p===rec?' <span class="st-tag">Recomendado</span>':''}</span><span class="mt">${!avail(p)?(p.inj?'Lesionado':'Suspenso'):j>=0?'Titular em '+rs[j]:'Reserva'}${p.p2?' · também '+p.p2:''}</span></span><span class="effv"><b class="${pn>1?'dn':''}">${eff(p,r)}</b><small>${pn?`força ${FZ(p.o)} −${pn}`:'na função'}</small></span></button>`};
   const a=list.filter(p=>avail(p)&&nat(p)),b=list.filter(p=>avail(p)&&!nat(p)),c=list.filter(p=>!avail(p));
   openSheet(`Escolher ${RN[r].toLowerCase()}`,`<p class="hint">Primeiro quem joga nesta função, do melhor para o pior; depois os improvisos. Se o escolhido já for titular em outra posição, os dois trocam de lugar.</p>
     ${a.length?`<p class="tiny mute" style="font-weight:700">DA POSIÇÃO</p>${a.map(row).join('')}`:''}
@@ -2870,7 +2871,7 @@ function openPlayer(pid){
       <div class="row">${[[.85,'Oferta baixa'],[1,'Valor pedido'],[1.2,'Cobrir +20%']].map(([m,n],i)=>`<button class="btn sm grow ${i===1?'pri':''}" style="flex-direction:column;gap:0" data-a="buy" data-v="${p.id}:${m}" ${tried?'disabled':''}><span class="tiny">${n}</span><b>${money(a*m)}</b></button>`).join('')}</div>
       <p class="hint">Chance de aceite: baixa ≈ 10%, pedida ≈ 50%, cobrindo é garantido, desde que o clube tenha mais de 18 jogadores.</p>`;
   }
-  const d=p.o-p.o0;
+  const d=FZ(p.o)-FZ(p.o0);
   const favBtn=p.t!==S.me?`<button class="btn sm ${isFav(p.id)?'on':''}" data-a="fav" data-v="${p.id}" style="align-self:flex-start">${isFav(p.id)?'♥ Nos favoritos':'♡ Adicionar aos favoritos'}</button>`:'';
   const back=UI.backTeam&&p.t===UI.backTeam&&p.t!==S.me?`<button class="btn sm ghost" data-a="team" data-v="${p.t}" style="align-self:flex-start">← Elenco do ${esc(T(p.t).name)}</button>`:'';
   openSheet(p.n,`${back}${favBtn}
@@ -3801,27 +3802,29 @@ Object.assign(ACT,{
    VENDA IMEDIATA: você pede um preço; perto do valor de mercado vende fácil,
    acima disso a chance cai. Se vender, o dinheiro entra na hora.
    ====================================================================== */
-function sellChance(p,price){const r=price/Math.max(.05,value(p));return r<=1.0005?1:r<=1.15?.6:r<=1.3?.35:r<=1.5?.15:r<=1.8?.04:0}
+function sellChance(p,price){const r=price/Math.max(.001,value(p));return r<=1.0005?1:r<=1.15?.6:r<=1.3?.35:r<=1.5?.15:r<=1.8?.04:0}
 function sellBox(p){
   const v=value(p);const blk=p.sgn===S.season;const last=(S.sellTry||{})[p.id];
   const tried=last&&last.d===S.d;
   return `<div class="offer"><p class="tiny" style="font-weight:700">VENDER</p>
     ${blk?'<p class="small">Contratado nesta temporada sem custo: só pode ser vendido na próxima.</p>':
     !inWindow()?`<p class="small">Janela fechada. ${windowText()}</p>`:
-    `<div class="row" style="align-items:flex-end"><label class="grow" for="sellp">Preço pedido (R$ milhões)<input type="number" id="sellp" step="0.1" min="0.05" value="${(tried?Math.min(last.p*.9,v):v).toFixed(1)}" data-in="sellp"></label><button class="btn sm pri" data-a="sellgo" data-v="${p.id}">Vender agora</button></div>
+    `<div class="row" style="align-items:flex-end"><label class="grow" for="sellp">Preço pedido (R$ milhões)<input type="number" id="sellp" step="0.01" min="0.01" placeholder="vazio = valor de mercado" value="${+(tried?Math.min(last.p*.9,v):v).toFixed(v<1?3:2)}" data-in="sellp"></label><button class="btn sm pri" data-a="sellgo" data-v="${p.id}">Vender agora</button></div>
     <button class="btn sm" style="margin-top:6px;width:100%" data-a="sellmk" data-v="${p.id}">Vender pelo valor de mercado (${money(v)}) · venda garantida</button>
     <p class="hint">Sugestão: <b>${money(v)}</b> (valor de mercado). Pedindo até isso, vende sempre; acima, cada vez mais difícil — com mais de 80% acima, ninguém paga.${tried?` Hoje ninguém pagou ${money(last.p)}: só dá para tentar de novo com um preço menor.`:''}</p>`}</div>`;
 }
 function sellNow(pid){
-  const p=P(pid);const el=$('#sellp');const price=Math.max(.05,parseFloat(((el&&el.value)||'').replace(',','.'))||0);
+  const p=P(pid);const el=$('#sellp');const typed=parseFloat(((el&&el.value)||'').replace(',','.'));
+  /* campo vazio ou zero = vende pelo valor de mercado (garantido) */
+  const price=typed>0?typed:Math.max(.01,Math.floor(value(p)*1000)/1000);
   if(!(price>0))return toast('Informe um preço.');
   if(!inWindow())return toast('Janela fechada.');
   if(sqLen(S.me)<=16)return toast('Mínimo de 16 jogadores no elenco.');
   S.sellTry=S.sellTry||{};const last=S.sellTry[pid];
-  if(last&&last.d===S.d&&price>=last.p)return toast(`Hoje ninguém pagou ${money(last.p)}. Peça menos.`);
+  if(last&&last.d===S.d&&price>=last.p&&price>value(p)*1.0005)return toast(`Hoje ninguém pagou ${money(last.p)}. Peça menos.`);
   let buyers=buyersFor(p,price).filter(t=>sqLen(t.id)<32);
   /* pelo valor de mercado (ou menos) a venda é garantida: se ninguém “natural” quiser, o clube mais rico com caixa e vaga compra */
-  const sure=price<=Math.max(.05,value(p))*1.0005;
+  const sure=price<=value(p)*1.0005;
   if(sure&&!buyers.length)buyers=Object.values(S.teams).filter(t=>t.id!==S.me&&sqLen(t.id)<32&&t.cash>=price).sort((a,b)=>b.cash-a.cash).slice(0,1);
   if(!buyers.length||R()>=sellChance(p,price)){S.sellTry[pid]={d:S.d,p:price};save();openPlayer(pid);return toast(buyers.length?`Nenhum clube aceitou pagar ${money(price)}.`:'Nenhum clube tem caixa ou vaga para esse valor.')}
   const b=buyers.sort((x,y)=>y.rep-x.rep)[0];
@@ -3829,7 +3832,7 @@ function sellNow(pid){
   news(`${p.n} vendido ao ${b.name} por ${money(price)}.`);toast(`Vendido ao ${b.name}: +${money(price)}`);closeSheet();save();render();
 }
 ACT.sellgo=v=>sellNow(+v);
-ACT.sellmk=v=>{const el=$('#sellp');if(el)el.value=Math.max(.05,Math.floor(value(P(+v))*100)/100);sellNow(+v)};
+ACT.sellmk=v=>{const el=$('#sellp');if(el)el.value='';sellNow(+v)};
 
 /* ---------- leilão sem cronômetro: você decide no seu tempo ----------
    cada lance seu recebe resposta imediata dos rivais (cobrem ou desistem);
@@ -3867,6 +3870,6 @@ function aucPass(){
 }
 
 </script>
-<script>const APPV="59";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="60";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
