@@ -3699,16 +3699,17 @@ Object.assign(ACT,{
 function markEv(p,f0){const f1=FZ(p.o);if(f1!==f0)p.ev=f1>f0?1:-1}
 /* evolução estilo Elifoot: sem teto. Descansando, sobe; jogando, cansa e cai aos poucos; voltou a descansar, sobe de novo.
    A idade pesa: jovem descansado sobe mais rápido; veterano (33+, craque 35+) tende a cair. */
-var DVP={a:.5,b:.5,d:.09,s:1.8,sd:.7};
+/* evolução dinâmica estilo Elifoot: a cada 2–3 rodadas o jogador ganha ou perde 1 de força.
+   descansando sobe; jogando oscila e tende a cair devagar; quanto mais forte, mais rápido sobe; craque bem mais */
+var DVP={pu:.13,pd:.23,ru:[.3,.22,.14,.06],rd:[.13,.13,.15,.19],a:.9,b:.2,s:1.7,sd:.75,pr:1.4};
 function devPlayer(p,played){
   const star=isStar(p);const old=p.a>=(star?35:33);let up,dn;
-  if(played){up=.05;dn=.08}
-  else{up=p.a<=25?.16:p.a<=29?.1:p.a<=32?.06:.03;dn=0}
-  /* quanto mais forte, mais rápido sobe; craque sobe bem mais; promessa (💎) também acelera */
-  const F=FZ(p.o);up*=DVP.a+F/50*DVP.b;if(played)dn=DVP.d;
-  if(star){up*=DVP.s;if(played)dn*=DVP.sd}
-  else if(p.prom&&p.a<=25)up*=1.4;
-  if(old){up*=.4;dn+=.06}
+  if(played){up=DVP.pu;dn=DVP.pd}
+  else{const k=p.a<=25?0:p.a<=29?1:p.a<=32?2:3;up=DVP.ru[k];dn=DVP.rd[k]}
+  const F=FZ(p.o);up*=DVP.a+F/50*DVP.b;
+  if(star){up*=DVP.s;dn*=DVP.sd}
+  else if(p.prom&&p.a<=25)up*=DVP.pr;
+  if(old){up*=.4;dn+=.1}
   if(p.inj>0)up=0;
   const r=R();if(r<dn)return -1;if(r<dn+up)return 1;return 0;
 }
@@ -3717,7 +3718,7 @@ function roundDev(teams,ap){ap=ap||new Set();
   teams.forEach(tid=>{(SQ.get(tid)||[]).forEach(p=>{
     if(tid===S.me&&p.evd!==S.d){p.ev=0}
     const d=devPlayer(p,ap.has(p.id));if(!d)return;
-    const f0=FZ(p.o);p.o=clamp(p.o+d,38,95);if(p.o>p.pot)p.pot=p.o;p.evd=S.d;markEv(p,f0);
+    const f0=FZ(p.o);p.o=clamp(+(p.o+d*.9).toFixed(2),38,95);if(p.o>p.pot)p.pot=p.o;p.evd=S.d;markEv(p,f0);
     /* promessa que desabrocha vira craque (*) */
     if(d>0&&p.prom&&!isStar(p)&&p.a<=25&&FZ(p.o)>=22&&R()<.1){p.star=1;if(tid===S.me)news(`✱ ${p.n} desabrochou e virou craque!`);}
     if(tid===S.me&&p.ev)(p.ev>0?ups:downs).push(`${p.n} ${p.ev>0?'▲':'▼'}`);
@@ -3818,6 +3819,6 @@ function aucPass(){
 }
 
 </script>
-<script>const APPV="51";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="52";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
