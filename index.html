@@ -1403,13 +1403,13 @@ function koDecider(m,c){
 }
 function postDate(all){
   const d=S.d;
-  {const pl=new Set();for(const [,res] of all)res.forEach(m=>{pl.add(m.h);pl.add(m.a)});if(pl.has(S.me))(SQ.get(S.me)||[]).forEach(p=>{if(p.evd!==S.d)p.ev=0});S._pl=pl}
+  {const pl=new Set(),ap=new Set();for(const [,res] of all)res.forEach(m=>{pl.add(m.h);pl.add(m.a);for(const t of [m.h,m.a])(m.app&&m.app[t]||[]).forEach(id=>ap.add(id))});if(pl.has(S.me))(SQ.get(S.me)||[]).forEach(p=>{if(p.evd!==S.d)p.ev=0});S._pl=pl;S._ap=ap}
   for(const [c,res] of all){
     res.forEach(m=>{matchPost(m,c);m.ev.forEach(e=>{if((e.k==='gol'||e.k==='pg')&&e.id){const g=c.gls||(c.gls={});g[e.id]=(g[e.id]||0)+1}})});
     c.last=res.map(m=>[m.h,m.a,m.gh,m.ga]);c.lastD=d;
     compRecord(c,res);
   }
-  if(S._pl){roundDev([...S._pl]);delete S._pl}
+  if(S._pl){roundDev([...S._pl],S._ap);delete S._pl;delete S._ap}
   RKC=null;for(const k in XC)delete XC[k];
   S.players.forEach(p=>{if(p.inj>0)p.inj--});
   Object.values(S.teams).forEach(t=>{
@@ -2589,7 +2589,7 @@ function renderOpcoes(){
   <div class="card"><h3>Mercado, contratos e leilão</h3>
     <p class="small">Duas janelas: do início da temporada até 3 de março, e julho a agosto. Fora delas, só jogadores sem clube. Salários são mensais. No fim de cada temporada os contratos perdem um ano; quem chega a zero sai de graça. Para vender, abra um leilão com preço mínimo: os clubes dão lances durante 4 datas da janela e o maior lance leva.</p></div>
   <div class="card"><h3>Como funciona a evolução</h3>
-    <p class="small">Todo mês sai um relatório de evolução. Jogadores até 23 anos sobem em direção ao <b>potencial</b> (as estrelas) mesmo sem jogar, mas evoluem bem mais rápido quando entram em campo; qualquer participação conta, mesmo entrando no fim. Entre 24 e 26 ainda crescem um pouco. Entre 27 e 29 a força oscila pouco, e reserva encostado pode cair. A partir dos 30 começa a queda, mais forte depois dos 33. 💎 marca as grandes promessas.</p></div>
+    <p class="small">Igual ao Elifoot: não há teto. A cada rodada, quem <b>descansa</b> tende a subir (jovens até 25 sobem mais rápido; quanto mais forte, mais devagar); quem <b>joga</b> cansa e cai aos poucos; voltando a descansar, sobe de novo. Veteranos (33+, craques 35+) tendem a cair. Lesão tira 3 pontos. Subiu na rodada = força em azul; caiu = vermelho.</p></div>
   <div class="card"><h3>Sobre os dados</h3>
     <p class="small">Elencos, posições, idades, contratos, valores de mercado e notas da temporada 2026 tirados do Sofascore em 13/10/2026, para ${Object.keys(S.teams).length} clubes. A força combina nota média (ajustada pelo nível de cada competição), valor de mercado e idade; o potencial vem da idade e do valor de mercado dos jovens. Clubes pequenos sem elenco no Sofascore receberam jogadores gerados. Toque em qualquer jogador para corrigir.</p></div>
   <div class="card"><h3>Salvar</h3>
@@ -3674,23 +3674,23 @@ Object.assign(ACT,{
    Subiu na rodada = número em azul; caiu = vermelho. Lesão tira 3 pontos de força.
    ====================================================================== */
 function markEv(p,f0){const f1=FZ(p.o);if(f1!==f0)p.ev=f1>f0?1:-1}
-function devPlayer(p){
-  const mp=Math.max(1,S.teams[p.t]?S.teams[p.t].mp:1);const share=clamp(p.j/mp,0,1);const star=isStar(p);let d=0;const k=.25;
-  if(p.a<=25){if(p.o<p.pot&&R()<(.3+.4*share)*k){d=1;if(share>.35&&R()<.4)d=2}}
-  else if(p.a<=26){if(p.o<p.pot&&R()<(.15+.2*share)*k)d=1}
-  else if(star&&p.a<=32){if(p.o<Math.max(p.pot,p.o0+3)&&R()<(.09+.14*share)*k)d=1}
-  else if(star&&p.a<=34){if(share<.1&&R()<.03*k)d=-1}
-  else if(p.a<=29){if(p.o<p.pot&&R()<(.08+.1*share)*k)d=1;else if(R()<.022*k)d=-1}
-  else if(p.a<=32){if(R()<.09*k)d=-1}
-  else{if(R()<.18*k)d=p.a>=35&&R()<.25?-2:-1}
-  if(p.inj>=6&&d>0)d=0;
-  return d;
+/* evolução estilo Elifoot: sem teto. Descansando, sobe; jogando, cansa e cai aos poucos; voltou a descansar, sobe de novo.
+   A idade pesa: jovem descansado sobe mais rápido; veterano (33+, craque 35+) tende a cair. */
+function devPlayer(p,played){
+  const star=isStar(p);const old=p.a>=(star?35:33);let up,dn;
+  if(played){up=.05;dn=.08}
+  else{up=p.a<=25?.16:p.a<=29?.1:p.a<=32?.06:.03;dn=0}
+  /* quanto mais forte, mais difícil subir (mas sem teto) */
+  up*=Math.max(.3,1-(FZ(p.o)-20)/50);
+  if(old){up*=.4;dn+=.06}
+  if(p.inj>0)up=0;
+  const r=R();if(r<dn)return -1;if(r<dn+up)return 1;return 0;
 }
-function roundDev(teams){
+function roundDev(teams,ap){ap=ap||new Set();
   const ups=[],downs=[];
   teams.forEach(tid=>{(SQ.get(tid)||[]).forEach(p=>{
     if(tid===S.me&&p.evd!==S.d){p.ev=0}
-    const d=devPlayer(p);if(!d)return;
+    const d=devPlayer(p,ap.has(p.id));if(!d)return;
     const f0=FZ(p.o);p.o=clamp(p.o+d,38,95);if(p.o>p.pot)p.pot=p.o;p.evd=S.d;markEv(p,f0);
     /* promessa que desabrocha vira craque (*) */
     if(d>0&&p.prom&&!isStar(p)&&p.a<=25&&FZ(p.o)>=22&&R()<.1){p.star=1;if(tid===S.me)news(`✱ ${p.n} desabrochou e virou craque!`);}
@@ -3755,6 +3755,6 @@ function sellNow(pid){
 ACT.sellgo=v=>sellNow(+v);
 
 </script>
-<script>const APPV="49";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="50";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
