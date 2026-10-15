@@ -762,6 +762,8 @@ input::placeholder{color:#7fb38f}
 .ggrid .gr .gep .ge{flex-basis:auto;padding-left:4px}
 .ggrid .gr .gep .ge+.ge{text-align:right;padding-right:4px;padding-left:0}
 .pstat b{font-size:1.05rem;white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word;line-height:1.15}
+/* valores longos (R$ 16.834.500): quebra só entre "R$" e o número, nunca no meio */
+.pstat b,.stats .stat b{word-break:normal!important;overflow-wrap:normal!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;font-size:.98rem;line-height:1.15}
 
 </style>
 
@@ -792,7 +794,8 @@ const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* salário: sempre redondo na centena (23 mil, 253 mil, 534.500) */
 function sal(v){const r=Math.round(Math.abs(v)*1e4)*100;return (v<0?'−':'')+'R$ '+(r%1000===0?(r/1000).toLocaleString('pt-BR')+' mil':r.toLocaleString('pt-BR'))}
-function money(v){const s=v<0?'−':'';v=Math.abs(v);return s+'R$ '+(v>=1?v.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+' mi':Math.round(v*1000).toLocaleString('pt-BR')+' mil')}
+/* todo valor em dinheiro: redondo na centena (23 mil, 534.500, 12.534.500) */
+function money(v){return sal(v)}
 const FN=['Lucas','Gabriel','Pedro','João','Matheus','Rafael','Vitor','Caio','Igor','Diego','Thiago','Bruno','Felipe','Kauã','Ryan','Davi','Erick','Wesley','Luan','Yuri','Renan','Murilo','Arthur','Enzo','Samuel','Henrique','Alisson','Jean','Kayky','Marcos','Nathan','Breno','Kaio','Miguel'];
 const LN=['Silva','Souza','Santos','Oliveira','Pereira','Lima','Costa','Ferreira','Rodrigues','Almeida','Nascimento','Carvalho','Ribeiro','Gomes','Martins','Araújo','Barbosa','Rocha','Dias','Moura','Teixeira','Cardoso','Freitas','Batista','Correia','Monteiro','Pinto','Cunha','Mendes','Vieira'];
 const FN_ES=['Juan','Santiago','Matías','Nicolás','Facundo','Agustín','Lucas','Tomás','Diego','Franco','Bruno','Mateo','Joaquín','Felipe','Sebastián','Andrés','Carlos','Luis','Kevin','Brian'];
@@ -3872,6 +3875,6 @@ function aucPass(){
 }
 
 </script>
-<script>const APPV="61";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="62";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
