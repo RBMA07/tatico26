@@ -756,6 +756,8 @@ input::placeholder{color:#7fb38f}
 .gpan .gpan-go{order:3;margin-left:auto}
 .gmine .gside .gt{max-width:none;flex:none}
 .sti.sx{font-size:.58rem;font-style:normal;color:#ffb3a8;margin-left:3px}
+/* lance embaixo do time que fez: mandante à esquerda, visitante à direita */
+.ggrid .gr .ge.aw{text-align:right;padding-left:0;padding-right:4px}
 
 </style>
 
@@ -3515,7 +3517,7 @@ function card(m,t,red){
   const p=wsel(on.map(([r,id])=>[P(id),CARDW[compOf(P(id))]]));if(!p)return;
   if(!red){m.yc[p.id]=(m.yc[p.id]||0)+1;if(m.yc[p.id]<2){
     /* 3 amarelos acumulados = suspenso no próximo jogo */
-    p.yc=(p.yc||0)+1;if(p.yc>=3){p.yc=0;p.sus=1;m.newSus.push(p.id);m.ev.push({min:m.min,t,k:'am',n:p.n+' (3º amarelo: segue em campo, desfalca o próximo jogo)'})}else m.ev.push({min:m.min,t,k:'am',n:p.n});return}}
+    p.yc=(p.yc||0)+1;if(p.yc>=3){p.yc=0;p.sus=1;m.newSus.push(p.id);m.ev.push({min:m.min,t,k:'am',n:p.n})}else m.ev.push({min:m.min,t,k:'am',n:p.n});return}}
   m.ev.push({min:m.min,t,k:'vm',n:p.n});p.sus=1;m.newSus.push(p.id);takeOff(m,t,p.id);m.down[t]=(m.down[t]||0)+1;
 }
 const MAXSUB=3;
@@ -3575,11 +3577,11 @@ const moralTxt=()=>{const v=T(S.me).mood;return v>=80?'Ótima':v>=62?'Boa':v>=45
    ====================================================================== */
 const tbox=(id,me)=>{const t=T(id),bg=bgOf(t);return `<span class="gt ${id===S.me?'mine':''}" style="background:${bg};color:${fgOn(bg)}">${esc(t.name)}</span>`};
 function liveScore(x,cur){const vis=x.ev.filter(e=>(e.k==='gol'||e.k==='pg')&&e.min<=cur);return [vis.filter(e=>e.t===x.h).length,vis.filter(e=>e.t===x.a).length,vis[vis.length-1]]}
-function lastEv(x,cur){const e=x.ev.filter(e=>e.min<=cur&&(e.k==='gol'||e.k==='pg'||e.k==='vm'||e.k==='les'||e.k==='pp')).slice(-1)[0];if(!e)return '';return `<span class="ge k-${e.k}">${ICON[e.k]||''} ${e.min}' ${esc(e.n.split(' (')[0])}</span>`}
+function lastEv(x,cur){const e=x.ev.filter(e=>e.min<=cur&&(e.k==='gol'||e.k==='pg'||e.k==='vm'||e.k==='les'||e.k==='pp')).slice(-1)[0];if(!e)return '';return `<span class="ge k-${e.k} ${e.t===x.a?'aw':''}">${ICON[e.k]||''} ${e.min}' ${esc(e.n.split(' (')[0])}</span>`}
 /* tela de jogo incremental: o esqueleto é montado uma vez por partida; a cada tick só o que mudou é trocado
    (antes o #match inteiro era recriado a cada lance → rolagem travando) */
 /* último lance do SEU jogo (gol, cartões, lesão) — sem revelar o pênalti antes da animação */
-function myLastEv(m,hid){const e=m.ev.filter(e=>e!==hid&&['gol','pg','pp','am','vm','les'].includes(e.k)).slice(-1)[0];if(!e)return '';return `<span class="ge k-${e.k}">${ICON[e.k]||''} ${e.min}' ${esc(e.n.split(' (')[0])} <i>${esc(T(e.t).code)}</i></span>`}
+function myLastEv(m,hid){const e=m.ev.filter(e=>e!==hid&&['gol','pg','pp','am','vm','les'].includes(e.k)).slice(-1)[0];if(!e)return '';return `<span class="ge k-${e.k} ${e.t===m.a?'aw':''}">${ICON[e.k]||''} ${e.min}' ${esc(e.n.split(' (')[0])}</span>`}
 function setH(el,h){if(el&&el._h!==h){el._h=h;el.innerHTML=h}}
 const GORD=['LIB','SUD','CB','A','B','C','D'];
 function renderMatch(){
@@ -3767,7 +3769,7 @@ function injure(m,t){
 /* ícones de situação: 🟥 suspenso, 🚑 lesionado (dias), 🟨 amarelos acumulados */
 /* ícones DURANTE o jogo: amarelo nesta partida (risco de expulsão) e quem já está fora do próximo pelo 3º amarelo.
    O 🟥 fica só para quem foi expulso — e expulso não aparece mais em campo */
-function liveIcons(m,p){const y=m.yc&&m.yc[p.id];return (y?'<i class="sti">🟨</i>':'')+(m.newSus&&m.newSus.includes(p.id)?'<i class="sti sx">fora do próximo</i>':'')+(p.inj?'<i class="sti">🚑</i>':'')}
+function liveIcons(m,p){const y=m.yc&&m.yc[p.id];return (y?'<i class="sti">🟨</i>':'')+(p.inj?'<i class="sti">🚑</i>':'')}
 function stIcons(p){return (p.sus?'<i class="sti">🟥</i>':'')+(p.inj?`<i class="sti">🚑<small>${p.inj}</small></i>`:'')+(p.yc?`<i class="sti">🟨${p.yc>1?'<small>'+p.yc+'</small>':''}</i>`:'')}
 
 ACT.mev=()=>{MS.showEv=!MS.showEv;renderMatch()};
@@ -3852,6 +3854,6 @@ function aucPass(){
 }
 
 </script>
-<script>const APPV="56";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="57";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
