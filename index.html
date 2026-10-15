@@ -3801,7 +3801,7 @@ Object.assign(ACT,{
    VENDA IMEDIATA: você pede um preço; perto do valor de mercado vende fácil,
    acima disso a chance cai. Se vender, o dinheiro entra na hora.
    ====================================================================== */
-function sellChance(p,price){const r=price/Math.max(.01,value(p));return r<=.8?.95:r<=1?.85:r<=1.15?.6:r<=1.3?.35:r<=1.5?.15:r<=1.8?.04:0}
+function sellChance(p,price){const r=price/Math.max(.05,value(p));return r<=1.0005?1:r<=1.15?.6:r<=1.3?.35:r<=1.5?.15:r<=1.8?.04:0}
 function sellBox(p){
   const v=value(p);const blk=p.sgn===S.season;const last=(S.sellTry||{})[p.id];
   const tried=last&&last.d===S.d;
@@ -3809,7 +3809,8 @@ function sellBox(p){
     ${blk?'<p class="small">Contratado nesta temporada sem custo: só pode ser vendido na próxima.</p>':
     !inWindow()?`<p class="small">Janela fechada. ${windowText()}</p>`:
     `<div class="row" style="align-items:flex-end"><label class="grow" for="sellp">Preço pedido (R$ milhões)<input type="number" id="sellp" step="0.1" min="0.05" value="${(tried?Math.min(last.p*.9,v):v).toFixed(1)}" data-in="sellp"></label><button class="btn sm pri" data-a="sellgo" data-v="${p.id}">Vender agora</button></div>
-    <p class="hint">Sugestão: <b>${money(v)}</b> (valor de mercado). Pedindo até isso, vende fácil; acima, cada vez mais difícil — com mais de 80% acima, ninguém paga.${tried?` Hoje ninguém pagou ${money(last.p)}: só dá para tentar de novo com um preço menor.`:''}</p>`}</div>`;
+    <button class="btn sm" style="margin-top:6px;width:100%" data-a="sellmk" data-v="${p.id}">Vender pelo valor de mercado (${money(v)}) · venda garantida</button>
+    <p class="hint">Sugestão: <b>${money(v)}</b> (valor de mercado). Pedindo até isso, vende sempre; acima, cada vez mais difícil — com mais de 80% acima, ninguém paga.${tried?` Hoje ninguém pagou ${money(last.p)}: só dá para tentar de novo com um preço menor.`:''}</p>`}</div>`;
 }
 function sellNow(pid){
   const p=P(pid);const el=$('#sellp');const price=Math.max(.05,parseFloat(((el&&el.value)||'').replace(',','.'))||0);
@@ -3818,13 +3819,17 @@ function sellNow(pid){
   if(sqLen(S.me)<=16)return toast('Mínimo de 16 jogadores no elenco.');
   S.sellTry=S.sellTry||{};const last=S.sellTry[pid];
   if(last&&last.d===S.d&&price>=last.p)return toast(`Hoje ninguém pagou ${money(last.p)}. Peça menos.`);
-  const buyers=buyersFor(p,price).filter(t=>sqLen(t.id)<32);
+  let buyers=buyersFor(p,price).filter(t=>sqLen(t.id)<32);
+  /* pelo valor de mercado (ou menos) a venda é garantida: se ninguém “natural” quiser, o clube mais rico com caixa e vaga compra */
+  const sure=price<=Math.max(.05,value(p))*1.0005;
+  if(sure&&!buyers.length)buyers=Object.values(S.teams).filter(t=>t.id!==S.me&&sqLen(t.id)<32&&t.cash>=price).sort((a,b)=>b.cash-a.cash).slice(0,1);
   if(!buyers.length||R()>=sellChance(p,price)){S.sellTry[pid]={d:S.d,p:price};save();openPlayer(pid);return toast(buyers.length?`Nenhum clube aceitou pagar ${money(price)}.`:'Nenhum clube tem caixa ou vaga para esse valor.')}
   const b=buyers.sort((x,y)=>y.rep-x.rep)[0];
   transfer(p,b.id,price);fixMyXI();delete S.sellTry[pid];
   news(`${p.n} vendido ao ${b.name} por ${money(price)}.`);toast(`Vendido ao ${b.name}: +${money(price)}`);closeSheet();save();render();
 }
 ACT.sellgo=v=>sellNow(+v);
+ACT.sellmk=v=>{const el=$('#sellp');if(el)el.value=Math.max(.05,Math.floor(value(P(+v))*100)/100);sellNow(+v)};
 
 /* ---------- leilão sem cronômetro: você decide no seu tempo ----------
    cada lance seu recebe resposta imediata dos rivais (cobrem ou desistem);
@@ -3862,6 +3867,6 @@ function aucPass(){
 }
 
 </script>
-<script>const APPV="58";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="59";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
