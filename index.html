@@ -738,6 +738,10 @@ input::placeholder{color:#7fb38f}
 /* cada linha de jogo tem altura fixa: o lance embaixo do placar já fica reservado */
 #match .wrap.el{overflow-anchor:none}
 .ggrid .gr .ge{display:block;min-height:1.05em;line-height:1.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.golo{animation:goloB 2.8s ease forwards}
+@keyframes goloB{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}10%{opacity:1;transform:translate(-50%,-50%) scale(1.12)}18%{transform:translate(-50%,-50%) scale(1)}85%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1)}}
+.gr.mine .ge{color:#fff;font-weight:700}.gr .ge i{font-style:normal;opacity:.6;font-size:.62rem}
+.gr .ge.k-am{color:#ffe14d}
 
 </style>
 
@@ -1507,6 +1511,7 @@ function simToSeasonEnd(){let g=0;const s=S.season;while(S.season===s&&g++<200&&
 const SPEEDS={1:Math.round(40000/45),2:Math.round(20000/45),4:Math.round(10000/45)};
 function runClock(){clearInterval(MS.timer);if(MS.paused||MS.done||MS.pen||MS.panim)return;MS.timer=setInterval(tick,SPEEDS[MS.speed]||SPEEDS[1])}
 function tick(){
+  if(MS.hold&&Date.now()<MS.hold)return;
   const m=MS.mine;
   if(m.min>=m.end){finishLive();return}
   const n0=m.ev.length;stepMatch(m);
@@ -3559,6 +3564,8 @@ function liveScore(x,cur){const vis=x.ev.filter(e=>(e.k==='gol'||e.k==='pg')&&e.
 function lastEv(x,cur){const e=x.ev.filter(e=>e.min<=cur&&(e.k==='gol'||e.k==='pg'||e.k==='vm'||e.k==='les'||e.k==='pp')).slice(-1)[0];if(!e)return '';return `<span class="ge k-${e.k}">${ICON[e.k]||''} ${e.min}' ${esc(e.n.split(' (')[0])}</span>`}
 /* tela de jogo incremental: o esqueleto é montado uma vez por partida; a cada tick só o que mudou é trocado
    (antes o #match inteiro era recriado a cada lance → rolagem travando) */
+/* último lance do SEU jogo (gol, cartões, lesão) — sem revelar o pênalti antes da animação */
+function myLastEv(m,hid){const e=m.ev.filter(e=>e!==hid&&['gol','pg','pp','am','vm','les'].includes(e.k)).slice(-1)[0];if(!e)return '';return `<span class="ge k-${e.k}">${ICON[e.k]||''} ${e.min}' ${esc(e.n.split(' (')[0])} <i>${esc(T(e.t).code)}</i></span>`}
 function setH(el,h){if(el&&el._h!==h){el._h=h;el.innerHTML=h}}
 const GORD=['LIB','SUD','CB','A','B','C','D'];
 function renderMatch(){
@@ -3569,7 +3576,8 @@ function renderMatch(){
   if(st&&st.t==='ko'){const rd=st.rounds[st.r];label+=' · '+rd.n+(rd.legs>1?` · ${st.l===0?'ida':'volta'}`:'')}else if(st){label+=st.groups.length>1?' · Grupo '+String.fromCharCode(65+st.groups.findIndex(g=>g.tb[me])):'';label+=` · ${st.j+1}ª rodada`}
   const clock=MS.done?'FIM':MS.half&&MS.paused&&m.min===45?'INTERVALO':MS.paused&&!MS.pen?`${Math.min(m.min,90)}' PAUSA`:`${Math.min(m.min,90)}'${m.min>90?'+'+(m.min-90):''}`;
   const goals=m.ev.filter(e=>(e.k==='gol'||e.k==='pg')&&e!==hid).length;
-  let flash='';if(!MS.done&&MS.gseen!=null&&goals>MS.gseen){const e=m.ev.filter(e=>e.k==='gol'||e.k==='pg').slice(-1)[0];flash=`<div class="golo ${e.t===me?'us':'them'}"><b>GOL!</b><span>${esc(T(e.t).name)} · ${esc(e.n.split(' (')[0])}</span></div>`;MS.gflash=Date.now()}
+  let flash='';if(!MS.done&&MS.gseen!=null&&goals>MS.gseen){const e=m.ev.filter(e=>e.k==='gol'||e.k==='pg').slice(-1)[0];MS.flashH=`<div class="golo ${e.t===me?'us':'them'}"><b>GOL!</b><span>${e.min}' · ${esc(T(e.t).name)} · ${esc(e.n.split(' (')[0])}</span></div>`;MS.flashUntil=Date.now()+2800;MS.hold=Date.now()+(MS.speed>=4?1600:2200)}
+  if(MS.flashH&&Date.now()<MS.flashUntil&&!MS.done)flash=MS.flashH;else MS.flashH=null;
   MS.gseen=goals;
   const root=$('#match');
   /* ---- esqueleto (uma vez por partida) ---- */
@@ -3622,7 +3630,7 @@ function renderMatch(){
   /* ---- placares dos outros jogos: só as linhas que mudaram ---- */
   MS._rows.forEach(row=>{const x=MS._gl[+row.dataset.gi];const mine=x===m;const [gh,ga]=mine?[shH,shA]:liveScore(x,cur);
     const hot=!MS.done&&x.ev.some(e=>(e.k==='gol'||e.k==='pg')&&e.min<=cur&&e.min>cur-3);
-    const le=(mine?'':lastEv(x,cur))||'<span class="ge"></span>';const k=gh+'|'+ga+'|'+(hot?1:0)+'|'+le;
+    const le=(mine?myLastEv(m,hid):lastEv(x,cur))||'<span class="ge"></span>';const k=gh+'|'+ga+'|'+(hot?1:0)+'|'+le;
     if(row._k!==k){row._k=k;row.classList.toggle('hot',hot);row.innerHTML=`${tbox(x.h)}<b class="gs">${gh}</b><b class="gs">${ga}</b>${tbox(x.a)}${le}`}});
   setH(root.querySelector('.govl'),flash+penAnimHTML()+soHTML());
   if(anc){const d=anc.getBoundingClientRect().top-ancY;if(Math.abs(d)>.5)w.scrollTop+=d}
@@ -3631,7 +3639,7 @@ function renderMatch(){
   /* só volta ao topo quando VOCÊ pede substituição (ou no fim); intervalo/lesão não mexem na rolagem */
   if(MS._wantTop&&panel){MS._wantTop=false;w.scrollTop=0}
   if(MS.done&&!MS._doneTop){MS._doneTop=true;w.scrollTop=0}
-  if(flash)setTimeout(()=>{const f=document.querySelector('#match .golo');if(f)f.remove()},1500);
+  if(flash&&!MS._ft){MS._ft=setTimeout(()=>{MS._ft=null;if(MS&&MS.mine)renderMatch()},2850)}
 }
 
 /* ---------- ações do modo Elifoot ---------- */
@@ -3826,6 +3834,6 @@ function aucPass(){
 }
 
 </script>
-<script>const APPV="53";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="54";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
