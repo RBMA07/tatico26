@@ -758,6 +758,9 @@ input::placeholder{color:#7fb38f}
 .sti.sx{font-size:.58rem;font-style:normal;color:#ffb3a8;margin-left:3px}
 /* lance embaixo do time que fez: mandante à esquerda, visitante à direita */
 .ggrid .gr .ge.aw{text-align:right;padding-left:0;padding-right:4px}
+.ggrid .gr .gep{flex-basis:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ggrid .gr .gep .ge{flex-basis:auto;padding-left:4px}
+.ggrid .gr .gep .ge+.ge{text-align:right;padding-right:4px;padding-left:0}
 
 </style>
 
@@ -3582,6 +3585,10 @@ function lastEv(x,cur){const e=x.ev.filter(e=>e.min<=cur&&(e.k==='gol'||e.k==='p
    (antes o #match inteiro era recriado a cada lance → rolagem travando) */
 /* último lance do SEU jogo (gol, cartões, lesão) — sem revelar o pênalti antes da animação */
 function myLastEv(m,hid){const e=m.ev.filter(e=>e!==hid&&['gol','pg','pp','am','vm','les'].includes(e.k)).slice(-1)[0];if(!e)return '';return `<span class="ge k-${e.k} ${e.t===m.a?'aw':''}">${ICON[e.k]||''} ${e.min}' ${esc(e.n.split(' (')[0])}</span>`}
+/* lances por time: o do mandante fica embaixo dele (esquerda), o do visitante embaixo dele (direita), independentes */
+const EVK=['gol','pg','pp','vm','les'];
+function evPair(x,cur,hid){const one=t=>{const e=x.ev.filter(e=>e.t===t&&e!==hid&&e.min<=cur&&EVK.includes(e.k)).slice(-1)[0];return e?`<span class="ge k-${e.k}">${ICON[e.k]||''} ${e.min}' ${esc(e.n.split(' (')[0])}</span>`:'<span class="ge"></span>'};
+  return `<span class="gep">${one(x.h)}${one(x.a)}</span>`}
 function setH(el,h){if(el&&el._h!==h){el._h=h;el.innerHTML=h}}
 const GORD=['LIB','SUD','CB','A','B','C','D'];
 function renderMatch(){
@@ -3592,9 +3599,10 @@ function renderMatch(){
   if(st&&st.t==='ko'){const rd=st.rounds[st.r];label+=' · '+rd.n+(rd.legs>1?` · ${st.l===0?'ida':'volta'}`:'')}else if(st){label+=st.groups.length>1?' · Grupo '+String.fromCharCode(65+st.groups.findIndex(g=>g.tb[me])):'';label+=` · ${st.j+1}ª rodada`}
   const clock=MS.done?'FIM':MS.half&&MS.paused&&m.min===45?'INTERVALO':MS.paused&&!MS.pen?`${Math.min(m.min,90)}' PAUSA`:`${Math.min(m.min,90)}'${m.min>90?'+'+(m.min-90):''}`;
   const goals=m.ev.filter(e=>(e.k==='gol'||e.k==='pg')&&e!==hid).length;
-  let flash='';if(!MS.done&&MS.gseen!=null&&goals>MS.gseen){const e=m.ev.filter(e=>e.k==='gol'||e.k==='pg').slice(-1)[0];MS.gnote={t:e.t,h:`⚽ ${e.min}' ${esc(e.n.split(' (')[0])}`,until:Date.now()+2600};flash='x'}
-  const gn=MS.gnote&&Date.now()<MS.gnote.until&&!MS.done?MS.gnote:null;if(!gn)MS.gnote=null;
-  const side=t=>`<div class="gside">${tbox(t)}<span class="gnote ${gn&&gn.t===t?'on':''}">${gn&&gn.t===t?gn.h:''}</span></div>`;
+  let flash='';if(!MS.done&&MS.gseen!=null&&goals>MS.gseen){MS.gn=MS.gn||{};m.ev.filter(e=>(e.k==='gol'||e.k==='pg')&&e!==hid).slice(MS.gseen).forEach(e=>{MS.gn[e.t]={h:`⚽ ${e.min}' ${esc(e.n.split(' (')[0])}`,until:Date.now()+2600,id:Math.random()}});flash='x'}
+  /* aviso de cada time é independente: gol de um não apaga o do outro */
+  const gnOf=t=>{const g=MS.gn&&MS.gn[t];return g&&Date.now()<g.until&&!MS.done?g:null};
+  const side=t=>{const g=gnOf(t);return `<div class="gside">${tbox(t)}<span class="gnote ${g?'on':''}" ${g?`data-k="${g.id}"`:''}>${g?g.h:''}</span></div>`};
   MS.gseen=goals;
   const root=$('#match');
   /* ---- esqueleto (uma vez por partida) ---- */
@@ -3648,7 +3656,7 @@ function renderMatch(){
   /* ---- placares dos outros jogos: só as linhas que mudaram ---- */
   MS._rows.forEach(row=>{const x=MS._gl[+row.dataset.gi];const mine=x===m;const [gh,ga]=mine?[shH,shA]:liveScore(x,cur);
     const hot=!MS.done&&x.ev.some(e=>(e.k==='gol'||e.k==='pg')&&e.min<=cur&&e.min>cur-3);
-    const le=(mine?myLastEv(m,hid):lastEv(x,cur))||'<span class="ge"></span>';const k=gh+'|'+ga+'|'+(hot?1:0)+'|'+le;
+    const le=evPair(x,mine?999:cur,mine?hid:null);const k=gh+'|'+ga+'|'+(hot?1:0)+'|'+le;
     if(row._k!==k){row._k=k;row.classList.toggle('hot',hot);row.innerHTML=`${tbox(x.h)}<b class="gs">${gh}</b><b class="gs">${ga}</b>${tbox(x.a)}${le}`}});
   setH(root.querySelector('.govl'),penAnimHTML()+soHTML());
   if(anc){const d=anc.getBoundingClientRect().top-ancY;if(Math.abs(d)>.5)w.scrollTop+=d}
@@ -3656,7 +3664,7 @@ function renderMatch(){
   if(fresh)requestAnimationFrame(()=>{const sec=w.querySelector('.gsec.gmy'),fx=w.querySelector('.gfix');if(sec&&fx)w.scrollTop+=sec.getBoundingClientRect().top-w.getBoundingClientRect().top-fx.offsetHeight-6});
   /* só volta ao topo quando VOCÊ pede substituição (ou no fim); intervalo/lesão não mexem na rolagem */
   if(MS.done&&!MS._doneTop){MS._doneTop=true;w.scrollTop=0}
-  if(flash&&!MS._ft){MS._ft=setTimeout(()=>{MS._ft=null;if(MS&&MS.mine)renderMatch()},2650)}
+  if(flash)setTimeout(()=>{if(MS&&MS.mine)renderMatch()},2650);
 }
 
 /* ---------- ações do modo Elifoot ---------- */
@@ -3854,6 +3862,6 @@ function aucPass(){
 }
 
 </script>
-<script>const APPV="57";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="58";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
