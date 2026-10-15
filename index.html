@@ -735,6 +735,9 @@ input::placeholder{color:#7fb38f}
 .ggrid .gr{contain:content}.gsec.gmy{outline:1px solid #ffe14d55}
 .gctl .btn.sm{padding:6px 8px}
 #auclive .al-bar{display:none}
+/* cada linha de jogo tem altura fixa: o lance embaixo do placar já fica reservado */
+#match .wrap.el{overflow-anchor:none}
+.ggrid .gr .ge{display:block;min-height:1.05em;line-height:1.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 </style>
 
@@ -3582,6 +3585,8 @@ function renderMatch(){
     MS._rows=[...root.querySelectorAll('.gr')];
   }
   const w=root.querySelector('.wrap.el');
+  /* âncora: a linha visível no topo não pode “andar” quando algo acima muda de altura */
+  let anc=null,ancY=0;if(!fresh&&w){const fx=w.querySelector('.gfix');const lim=(fx?fx.getBoundingClientRect().bottom:0);for(const r of MS._rows){const y=r.getBoundingClientRect().top;if(y>=lim){anc=r;ancY=y;break}}}
   /* ---- placar fixo ---- */
   setH(root.querySelector('.gtop'),`<span class="hg ${MS.paused||MS.done?'':'run'}">⏳</span><b>${clock}</b><span class="gl">${esc(label)}${!MS.done&&!MS.paused&&!MS.pen?'<br><i>toque aqui p/ substituir</i>':''}</span>`);
   setH(root.querySelector('.gmine'),`${tbox(m.h)}<b class="gs big">${shH}</b><b class="gs big">${shA}</b>${tbox(m.a)}`);
@@ -3617,14 +3622,15 @@ function renderMatch(){
   /* ---- placares dos outros jogos: só as linhas que mudaram ---- */
   MS._rows.forEach(row=>{const x=MS._gl[+row.dataset.gi];const mine=x===m;const [gh,ga]=mine?[shH,shA]:liveScore(x,cur);
     const hot=!MS.done&&x.ev.some(e=>(e.k==='gol'||e.k==='pg')&&e.min<=cur&&e.min>cur-3);
-    const le=mine?'':lastEv(x,cur);const k=gh+'|'+ga+'|'+(hot?1:0)+'|'+le;
+    const le=(mine?'':lastEv(x,cur))||'<span class="ge"></span>';const k=gh+'|'+ga+'|'+(hot?1:0)+'|'+le;
     if(row._k!==k){row._k=k;row.classList.toggle('hot',hot);row.innerHTML=`${tbox(x.h)}<b class="gs">${gh}</b><b class="gs">${ga}</b>${tbox(x.a)}${le}`}});
   setH(root.querySelector('.govl'),flash+penAnimHTML()+soHTML());
+  if(anc){const d=anc.getBoundingClientRect().top-ancY;if(Math.abs(d)>.5)w.scrollTop+=d}
   /* ao abrir: rola até a sua série; ao pausar/terminar: volta ao topo */
   if(fresh)requestAnimationFrame(()=>{const sec=w.querySelector('.gsec.gmy'),fx=w.querySelector('.gfix');if(sec&&fx)w.scrollTop+=sec.getBoundingClientRect().top-w.getBoundingClientRect().top-fx.offsetHeight-6});
-  const top=(MS.paused&&!MS.done)||MS.done?'p'+(MS.done?'d':m.min):'';
-  if(top&&MS._top!==top){MS._top=top;if(panel||endCard)w.scrollTop=0}
-  if(!MS.paused)MS._top='';
+  /* só volta ao topo quando VOCÊ pede substituição (ou no fim); intervalo/lesão não mexem na rolagem */
+  if(MS._wantTop&&panel){MS._wantTop=false;w.scrollTop=0}
+  if(MS.done&&!MS._doneTop){MS._doneTop=true;w.scrollTop=0}
   if(flash)setTimeout(()=>{const f=document.querySelector('#match .golo');if(f)f.remove()},1500);
 }
 
@@ -3741,6 +3747,7 @@ function stIcons(p){return (p.sus?'<i class="sti">🟥</i>':'')+(p.inj?`<i class
 ACT.mev=()=>{MS.showEv=!MS.showEv;renderMatch()};
 /* toque no placar = substituições (pausa o jogo) */
 ACT.mtop=()=>{if(!MS||MS.done||MS.pen||MS.paused||MS.panim||MS.so)return;ACT.mpause()};
+{const _mp=ACT.mpause;ACT.mpause=()=>{if(MS)MS._wantTop=true;_mp()}}
 
 Object.assign(ACT,{mstar:()=>{UI.mstar=!UI.mstar;render()},mprom:()=>{UI.mprom=!UI.mprom;render()}});
 
@@ -3819,6 +3826,6 @@ function aucPass(){
 }
 
 </script>
-<script>const APPV="52";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="53";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
