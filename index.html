@@ -727,6 +727,14 @@ input::placeholder{color:#7fb38f}
 #match .wrap.el>*{flex-shrink:0}
 .favb{flex:none;width:30px;height:30px;margin-left:4px;border:1px solid #2a7d47;border-radius:6px;background:#073d1c;color:#a9d6b6;font-size:1rem;line-height:1;padding:0}
 .favb.on{color:#ff6b81;border-color:#ff6b81}
+/* placar fixo no topo enquanto rola os outros jogos */
+#match .wrap.el{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.gfix{position:sticky;top:-10px;z-index:6;background:#0b5a2a;margin:-10px -10px 0;padding:10px 10px 6px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 10px -6px rgba(0,0,0,.5)}
+.gtop,.gmine{cursor:pointer;touch-action:manipulation}.gtop .gl i{font-style:normal;font-size:.62rem;color:#ffe14d;opacity:.9}
+.gbody{display:flex;flex-direction:column;gap:8px}.gbody:empty{display:none}
+.ggrid .gr{contain:content}.gsec.gmy{outline:1px solid #ffe14d55}
+.gctl .btn.sm{padding:6px 8px}
+#auclive .al-bar{display:none}
 
 </style>
 
@@ -3546,33 +3554,49 @@ const moralTxt=()=>{const v=T(S.me).mood;return v>=80?'Ótima':v>=62?'Boa':v>=45
 const tbox=(id,me)=>{const t=T(id),bg=bgOf(t);return `<span class="gt ${id===S.me?'mine':''}" style="background:${bg};color:${fgOn(bg)}">${esc(t.name)}</span>`};
 function liveScore(x,cur){const vis=x.ev.filter(e=>(e.k==='gol'||e.k==='pg')&&e.min<=cur);return [vis.filter(e=>e.t===x.h).length,vis.filter(e=>e.t===x.a).length,vis[vis.length-1]]}
 function lastEv(x,cur){const e=x.ev.filter(e=>e.min<=cur&&(e.k==='gol'||e.k==='pg'||e.k==='vm'||e.k==='les'||e.k==='pp')).slice(-1)[0];if(!e)return '';return `<span class="ge k-${e.k}">${ICON[e.k]||''} ${e.min}' ${esc(e.n.split(' (')[0])}</span>`}
+/* tela de jogo incremental: o esqueleto é montado uma vez por partida; a cada tick só o que mudou é trocado
+   (antes o #match inteiro era recriado a cada lance → rolagem travando) */
+function setH(el,h){if(el&&el._h!==h){el._h=h;el.innerHTML=h}}
+const GORD=['LIB','SUD','CB','A','B','C','D'];
 function renderMatch(){
   const {mine:m,c}=MS;const me=S.me;const cur=MS.done?999:m.min;
   const hid=MS.panim&&MS.panim.step<3?MS.panim.ev:null;
   const shH=m.gh-(hid&&hid.k==='pg'&&hid.t===m.h?1:0),shA=m.ga-(hid&&hid.k==='pg'&&hid.t===m.a?1:0);
   const st=c.st;let label=c.s;
   if(st&&st.t==='ko'){const rd=st.rounds[st.r];label+=' · '+rd.n+(rd.legs>1?` · ${st.l===0?'ida':'volta'}`:'')}else if(st){label+=st.groups.length>1?' · Grupo '+String.fromCharCode(65+st.groups.findIndex(g=>g.tb[me])):'';label+=` · ${st.j+1}ª rodada`}
-  const clock=MS.done?'FIM':MS.half&&MS.paused&&m.min===45?'INTERVALO':`${Math.min(m.min,90)}'${m.min>90?'+'+(m.min-90):''}`;
-  /* GOL! grande quando sai gol no seu jogo */
+  const clock=MS.done?'FIM':MS.half&&MS.paused&&m.min===45?'INTERVALO':MS.paused&&!MS.pen?`${Math.min(m.min,90)}' PAUSA`:`${Math.min(m.min,90)}'${m.min>90?'+'+(m.min-90):''}`;
   const goals=m.ev.filter(e=>(e.k==='gol'||e.k==='pg')&&e!==hid).length;
   let flash='';if(!MS.done&&MS.gseen!=null&&goals>MS.gseen){const e=m.ev.filter(e=>e.k==='gol'||e.k==='pg').slice(-1)[0];flash=`<div class="golo ${e.t===me?'us':'them'}"><b>GOL!</b><span>${esc(T(e.t).name)} · ${esc(e.n.split(' (')[0])}</span></div>`;MS.gflash=Date.now()}
   MS.gseen=goals;
-  /* todos os jogos da data, por competição (o seu campeonato primeiro) */
-  const order=['A','B','C','D','CB','LIB','SUD'];
-  const comps=(MS.all||[]).slice().sort(([a],[b])=>((b===c)-(a===c))||((order.indexOf(a.id)+99)%99-(order.indexOf(b.id)+99)%99));
-  const shown=UI.allg?comps:comps.filter(([cc])=>cc===c||order.includes(cc.id)).slice(0,6);
-  const grid=shown.map(([cc,res])=>`<div class="gsec"><div class="gh">${esc(cc.n)}</div>${res.map(x=>{const mine=x===m;const [gh,ga]=mine?[shH,shA]:liveScore(x,cur);const hot=!MS.done&&x.ev.some(e=>(e.k==='gol'||e.k==='pg')&&e.min<=cur&&e.min>cur-3);
-      return `<div class="gr ${mine?'mine':''} ${hot?'hot':''}" ${mine?'data-a="mev"':''}>${tbox(x.h)}<b class="gs">${gh}</b><b class="gs">${ga}</b>${tbox(x.a)}${lastEv(x,cur)}</div>`}).join('')}</div>`).join('');
-  const more=comps.length>shown.length?`<button class="btn sm gmore" data-a="allg">Ver todos os jogos do dia (${comps.reduce((s,[,r])=>s+r.length,0)})</button>`:'';
-  /* painel de trocas (pausa / intervalo / clique no seu time) */
+  const root=$('#match');
+  /* ---- esqueleto (uma vez por partida) ---- */
+  let fresh=false;
+  if(root._ms!==MS||!root.querySelector('.wrap.el .ggrid')){
+    fresh=true;root._ms=MS;
+    const rk=cc=>{const i=GORD.indexOf(cc.id);return i<0?50:i};
+    const all=(MS.all||[]).slice().sort(([a],[b])=>rk(a)-rk(b));
+    const comps=UI.allg?all:all.filter(([cc])=>cc===c||GORD.includes(cc.id));const nOut=all.length-comps.length;
+    MS._gl=[];
+    const grid=comps.map(([cc,res])=>`<div class="gsec ${cc===c?'gmy':''}"><div class="gh">${esc(cc.n)}</div>${res.map(x=>{MS._gl.push(x);return `<div class="gr ${x===m?'mine':''}" data-gi="${MS._gl.length-1}"></div>`}).join('')}</div>`).join('');
+    root.innerHTML=`<div class="wrap el"><div class="gfix"><div class="gtop" data-a="mtop"></div><div class="gmine" data-a="mtop"></div><div class="gctlb"></div></div><div class="gbody"></div><div class="ggrid">${grid}${nOut||UI.allg?`<button class="btn sm gmore" data-a="allg">${UI.allg?'Esconder outros países':`Ver jogos de outros países (${nOut} ligas)`}</button>`:''}</div></div><div class="govl"></div>`;
+    MS._rows=[...root.querySelectorAll('.gr')];
+  }
+  const w=root.querySelector('.wrap.el');
+  /* ---- placar fixo ---- */
+  setH(root.querySelector('.gtop'),`<span class="hg ${MS.paused||MS.done?'':'run'}">⏳</span><b>${clock}</b><span class="gl">${esc(label)}${!MS.done&&!MS.paused&&!MS.pen?'<br><i>toque aqui p/ substituir</i>':''}</span>`);
+  setH(root.querySelector('.gmine'),`${tbox(m.h)}<b class="gs big">${shH}</b><b class="gs big">${shA}</b>${tbox(m.a)}`);
+  const ctrl=MS.done?`<button class="btn pri big" data-a="mclose">Continuar</button>`:MS.pen?'':
+    `<div class="gctl">${MS.paused?`<button class="btn pri grow" data-a="mresume">${m.min===45&&MS.half?'▶ 2º tempo':'▶ Continuar'}</button>`:`<button class="btn grow" data-a="mpause">Substituições</button>`}<button class="btn sm ${MS.showEv?'on':''}" data-a="mev">Lances</button>${[1,2,4].map(v=>`<button class="btn sm ${MS.speed===v?'on':''}" data-a="mspd" data-v="${v}">${v===1?'Normal':v===2?'Rápida':'Super'}</button>`).join('')}<button class="btn sm" data-a="mskip">⏭</button></div><div class="gpost">${Object.entries(POST).map(([k,v])=>`<button class="${m.tac[me]===k?'on':''}" data-a="mtac" data-v="${k}">${PSHORT&&PSHORT[k]||v.n}</button>`).join('')}</div>`;
+  setH(root.querySelector('.gctlb'),ctrl);
+  /* ---- corpo: lances, painel de trocas, fim de jogo ---- */
   let panel='';
   if(MS.paused&&!MS.done&&!MS.pen){
     const onL=m.on[me].map(([r,id])=>P(id)).filter(Boolean).sort((a,b)=>'GDMA'.indexOf(GRP[a.p])-'GDMA'.indexOf(GRP[b.p]));
     const bn=bench(m,me).sort((a,b)=>'GDMA'.indexOf(GRP[a.p])-'GDMA'.indexOf(GRP[b.p])||b.o-a.o);
     const left=MAXSUB-m.subs[me];
-    panel=`<div class="sw"><div class="sw-h"><b>Substituições</b><span>${left} de ${MAXSUB} restantes · ${m.on[me].length} em campo · esquema ${(()=>{const k=g=>m.on[me].filter(x=>GRP[x[0]]===g).length;return `${k('D')}-${k('M')}-${k('A')}`})()}</span></div>
+    panel=`<div class="sw"><div class="sw-h"><b>Substituições · jogo parado</b><span>${left} de ${MAXSUB} restantes · esquema ${(()=>{const k=g=>m.on[me].filter(x=>GRP[x[0]]===g).length;return `${k('D')}-${k('M')}-${k('A')}`})()}</span></div>
       ${m.gap[me].length?`<p class="tiny" style="color:#ffd23f">Jogador lesionado saiu: escolha quem entra (sem tirar ninguém).</p>`:''}
-      <div class="sw-c"><div><p class="sw-t">EM CAMPO ${MS.eo?'· toque em quem entra →':'· toque em quem sai'}</p>${onL.map(p=>`<button class="sw-p ${MS.eo===p.id?'sel':''}" data-a="elout" data-v="${p.id}">${rpill(p.p)}<span>${esc(p.n)}${isStar(p)?'*':''}${stIcons(p)}</span><b>${FZ(p.o)}</b></button>`).join('')}</div>
+      <div class="sw-c"><div><p class="sw-t">EM CAMPO ${MS.eo?'· agora toque em quem entra →':'· toque em quem sai'}</p>${onL.map(p=>`<button class="sw-p ${MS.eo===p.id?'sel':''}" data-a="elout" data-v="${p.id}">${rpill(p.p)}<span>${esc(p.n)}${isStar(p)?'*':''}${stIcons(p)}</span><b>${FZ(p.o)}</b></button>`).join('')}</div>
       <div><p class="sw-t">RESERVAS</p>${bn.map(p=>`<button class="sw-p" data-a="elin" data-v="${p.id}" ${left<=0?'disabled':''}>${rpill(p.p)}<span>${esc(p.n)}${isStar(p)?'*':''}</span><b>${FZ(p.o)}</b></button>`).join('')||'<p class="tiny">Ninguém no banco.</p>'}</div></div></div>`;
   }
   if(MS.pen&&!MS.done){
@@ -3584,24 +3608,23 @@ function renderMatch(){
   if(MS.done){
     const ga=groupAfter(c,MS.ms);
     if(ga){const n=ga.after.length;endCard=`<div class="sw"><div class="sw-h"><b>Classificação · ${esc(label)}</b></div><div class="mtbl">${ga.after.map((r,i)=>{const z=c.stages.length>1?'z0':zcls(c,i,n);return `<div class="${r.id===me?'me':''}"><span><span class="zn ${z}"></span>${i+1}</span><span class="tm">${esc(T(r.id).name)}</span><span></span><span>${r.J}</span><span>${r.GP-r.GC}</span><b>${r.P}</b></div>`}).join('')}</div></div>`}
-    else if(m.agg||m.pens){const w=m.pens?(m.pens[0]>m.pens[1]?m.h:m.a):(m.agg[0]>m.agg[1]?m.h:m.a);
-      endCard=`<div class="sw"><p class="small">${m.agg&&st.rounds[st.r].legs>1?`Agregado: ${esc(T(m.h).name)} ${m.agg[0]} x ${m.agg[1]} ${esc(T(m.a).name)}. `:''}${m.pens?`Pênaltis: ${m.pens[0]} x ${m.pens[1]}. `:''}<b>${w===me?'Classificado!':'Eliminado.'}</b> ${esc(T(w).name)} avança${st.r===st.rounds.length-1?' e é campeão':''}.</p>${w===me&&(()=>{const pr=przOf(c);return pr&&pr.adv&&pr.adv[st.r]})()?`<p class="small" style="color:#12924a;font-weight:800">💰 Bônus por avançar: +${money(przOf(c).adv[st.r])}</p>`:''}</div>`}
+    else if(m.agg||m.pens){const w2=m.pens?(m.pens[0]>m.pens[1]?m.h:m.a):(m.agg[0]>m.agg[1]?m.h:m.a);
+      endCard=`<div class="sw"><p class="small">${m.agg&&st.rounds[st.r].legs>1?`Agregado: ${esc(T(m.h).name)} ${m.agg[0]} x ${m.agg[1]} ${esc(T(m.a).name)}. `:''}${m.pens?`Pênaltis: ${m.pens[0]} x ${m.pens[1]}. `:''}<b>${w2===me?'Classificado!':'Eliminado.'}</b> ${esc(T(w2).name)} avança${st.r===st.rounds.length-1?' e é campeão':''}.</p>${w2===me&&(()=>{const pr=przOf(c);return pr&&pr.adv&&pr.adv[st.r]})()?`<p class="small" style="color:#12924a;font-weight:800">💰 Bônus por avançar: +${money(przOf(c).adv[st.r])}</p>`:''}</div>`}
   }
   const evs=m.ev.filter(e=>e!==hid&&e.k!=='pen').slice().reverse();
-  const ctrl=MS.done?`<button class="btn pri big" data-a="mclose">Continuar</button>`:MS.pen?'':
-    `<div class="gctl">${MS.paused?`<button class="btn pri grow" data-a="mresume">${m.min===45&&MS.half?'▶ 2º tempo':'▶ Continuar'}</button>`:`<button class="btn grow" data-a="mpause">Substituições</button>`}${[1,2,4].map(v=>`<button class="btn sm ${MS.speed===v?'on':''}" data-a="mspd" data-v="${v}">${v===1?'Normal':v===2?'Rápida':'Supersônica'}</button>`).join('')}<button class="btn sm" data-a="mskip">Fim ⏭</button></div><div class="gpost">${Object.entries(POST).map(([k,v])=>`<button class="${m.tac[me]===k?'on':''}" data-a="mtac" data-v="${k}">${v.n.replace('Ultradefensivo','Ultradef.').replace('Ultraofensivo','Ultraof.').replace('Defensivo','Defens.').replace('Ofensivo','Ofens.').replace('Equilibrado','Equil.')}</button>`).join('')}</div>`;
-  const _ow=$('#match .wrap'),_st=_ow?_ow.scrollTop:0;
-  $('#match').innerHTML=`<div class="wrap el">
-    <div class="gtop"><span class="hg ${MS.paused||MS.done?'':'run'}">⏳</span><b>${clock}</b><span class="gl">${esc(label)}</span></div>
-    <div class="gmine" data-a="mev">${tbox(m.h)}<b class="gs big">${shH}</b><b class="gs big">${shA}</b>${tbox(m.a)}</div>
-    ${MS.showEv?`<div class="gev" data-a="mev">${evs.map(e=>`<div class="${e.t===me?'us':''} k-${e.k}"><span>${e.min}'</span><span>${ICON[e.k]||''}</span><span>${esc(e.n)} <i>${esc(T(e.t).code)}</i></span></div>`).join('')||'<div><span></span><span></span><span>A bola vai rolar…</span></div>'}<p class="gev-x">toque para fechar</p></div>`:'<p class="gev-tip">toque no placar para ver os lances</p>'}
-    <div class="ginfo"><span>Público ${(m.pub||0).toLocaleString('pt-BR')}</span><span>Árbitro ${esc(m.ref?m.ref.n:'—')}</span>${m.down[m.h]||m.down[m.a]?`<span>🟥 ${m.down[m.h]||0}–${m.down[m.a]||0}</span>`:''}${MS.done&&m.pens?`<span>Pênaltis ${m.pens[0]}–${m.pens[1]}</span>`:''}</div>
-    ${ctrl}
-    ${panel}
-    ${endCard}
-    <div class="ggrid">${grid}${more}</div>
-  </div>${flash}${penAnimHTML()}${soHTML()}`;
-  {const _nw=$('#match .wrap');if(_nw&&_st)_nw.scrollTop=_st}
+  const evBox=MS.showEv?`<div class="gev" data-a="mev">${evs.map(e=>`<div class="${e.t===me?'us':''} k-${e.k}"><span>${e.min}'</span><span>${ICON[e.k]||''}</span><span>${esc(e.n)} <i>${esc(T(e.t).code)}</i></span></div>`).join('')||'<div><span></span><span></span><span>A bola vai rolar…</span></div>'}<p class="gev-x">toque para fechar</p></div>`:'';
+  setH(root.querySelector('.gbody'),`${panel}${endCard}${evBox}<div class="ginfo"><span>Público ${(m.pub||0).toLocaleString('pt-BR')}</span><span>Árbitro ${esc(m.ref?m.ref.n:'—')}</span>${m.down[m.h]||m.down[m.a]?`<span>🟥 ${m.down[m.h]||0}–${m.down[m.a]||0}</span>`:''}${MS.done&&m.pens?`<span>Pênaltis ${m.pens[0]}–${m.pens[1]}</span>`:''}</div>`);
+  /* ---- placares dos outros jogos: só as linhas que mudaram ---- */
+  MS._rows.forEach(row=>{const x=MS._gl[+row.dataset.gi];const mine=x===m;const [gh,ga]=mine?[shH,shA]:liveScore(x,cur);
+    const hot=!MS.done&&x.ev.some(e=>(e.k==='gol'||e.k==='pg')&&e.min<=cur&&e.min>cur-3);
+    const le=mine?'':lastEv(x,cur);const k=gh+'|'+ga+'|'+(hot?1:0)+'|'+le;
+    if(row._k!==k){row._k=k;row.classList.toggle('hot',hot);row.innerHTML=`${tbox(x.h)}<b class="gs">${gh}</b><b class="gs">${ga}</b>${tbox(x.a)}${le}`}});
+  setH(root.querySelector('.govl'),flash+penAnimHTML()+soHTML());
+  /* ao abrir: rola até a sua série; ao pausar/terminar: volta ao topo */
+  if(fresh)requestAnimationFrame(()=>{const sec=w.querySelector('.gsec.gmy'),fx=w.querySelector('.gfix');if(sec&&fx)w.scrollTop+=sec.getBoundingClientRect().top-w.getBoundingClientRect().top-fx.offsetHeight-6});
+  const top=(MS.paused&&!MS.done)||MS.done?'p'+(MS.done?'d':m.min):'';
+  if(top&&MS._top!==top){MS._top=top;if(panel||endCard)w.scrollTop=0}
+  if(!MS.paused)MS._top='';
   if(flash)setTimeout(()=>{const f=document.querySelector('#match .golo');if(f)f.remove()},1500);
 }
 
@@ -3618,7 +3641,7 @@ Object.assign(ACT,{
     else return toast('Toque primeiro em quem sai (lista da esquerda).');
     renderMatch()},
   mspd:v=>{MS.speed=+v;S.mspeed=+v;runClock();renderMatch()},
-  allg:()=>{UI.allg=!UI.allg;renderMatch()}
+  allg:()=>{UI.allg=!UI.allg;const r=$('#match');r._ms=null;const w=r.querySelector('.wrap.el'),y=w?w.scrollTop:0;renderMatch();requestAnimationFrame(()=>{const w2=r.querySelector('.wrap.el');if(w2)w2.scrollTop=y})}
 });
 
 /* ---------- banco: empréstimo com juros altos (3% ao mês), como no clássico ---------- */
@@ -3676,12 +3699,15 @@ Object.assign(ACT,{
 function markEv(p,f0){const f1=FZ(p.o);if(f1!==f0)p.ev=f1>f0?1:-1}
 /* evolução estilo Elifoot: sem teto. Descansando, sobe; jogando, cansa e cai aos poucos; voltou a descansar, sobe de novo.
    A idade pesa: jovem descansado sobe mais rápido; veterano (33+, craque 35+) tende a cair. */
+var DVP={a:.5,b:.5,d:.09,s:1.8,sd:.7};
 function devPlayer(p,played){
   const star=isStar(p);const old=p.a>=(star?35:33);let up,dn;
   if(played){up=.05;dn=.08}
   else{up=p.a<=25?.16:p.a<=29?.1:p.a<=32?.06:.03;dn=0}
-  /* quanto mais forte, mais difícil subir (mas sem teto) */
-  up*=Math.max(.3,1-(FZ(p.o)-20)/50);
+  /* quanto mais forte, mais rápido sobe; craque sobe bem mais; promessa (💎) também acelera */
+  const F=FZ(p.o);up*=DVP.a+F/50*DVP.b;if(played)dn=DVP.d;
+  if(star){up*=DVP.s;if(played)dn*=DVP.sd}
+  else if(p.prom&&p.a<=25)up*=1.4;
   if(old){up*=.4;dn+=.06}
   if(p.inj>0)up=0;
   const r=R();if(r<dn)return -1;if(r<dn+up)return 1;return 0;
@@ -3712,6 +3738,8 @@ function injure(m,t){
 function stIcons(p){return (p.sus?'<i class="sti">🟥</i>':'')+(p.inj?`<i class="sti">🚑<small>${p.inj}</small></i>`:'')+(p.yc?`<i class="sti">🟨${p.yc>1?'<small>'+p.yc+'</small>':''}</i>`:'')}
 
 ACT.mev=()=>{MS.showEv=!MS.showEv;renderMatch()};
+/* toque no placar = substituições (pausa o jogo) */
+ACT.mtop=()=>{if(!MS||MS.done||MS.pen||MS.paused||MS.panim||MS.so)return;ACT.mpause()};
 
 Object.assign(ACT,{mstar:()=>{UI.mstar=!UI.mstar;render()},mprom:()=>{UI.mprom=!UI.mprom;render()}});
 
@@ -3754,7 +3782,42 @@ function sellNow(pid){
 }
 ACT.sellgo=v=>sellNow(+v);
 
+/* ---------- leilão sem cronômetro: você decide no seu tempo ----------
+   cada lance seu recebe resposta imediata dos rivais (cobrem ou desistem);
+   "Passar" encerra o lote com quem estiver na frente */
+function aucRivalTurn(L){
+  const nv=L.lead?+(L.cur+aucStep(L.cur)).toFixed(2):L.cur;
+  const c=aucRivs(L).filter(r=>r.id!==L.lead&&r.max>=nv&&T(r.id).cash>=nv);
+  if(!c.length)return false;
+  /* quanto mais folga até o teto, mais provável cobrir */
+  const r=c.sort((a,b)=>b.max-a.max)[0];if(R()>Math.min(.95,.55+(r.max-nv)/Math.max(.1,nv)))return false;
+  L.cur=nv;L.lead=r.id;L.flash=Date.now();return true;
+}
+function aucStartLot(){
+  const s=S.aucS,L=s.lots[s.i];const p=P(L.pid);
+  if(!p||p.t!==L.from){L.done=true;L.res='Lote retirado';s.i++;openAucLive();return}
+  clearInterval(AUCT);aucRivs(L);L.left=AUC_T0;
+  if(!L.lead&&aucRivalTurn(L))L.msg=`${T(L.lead).name} abre com ${money(L.cur)}. Sua vez.`;else if(!L.msg)L.msg='Lances abertos. Sua vez.';
+  aucPaint();
+}
+function aucTick(){clearInterval(AUCT)}
+function aucBidLive(){
+  const s=S.aucS;if(!s)return;const L=s.lots[s.i];if(!L||L.done||L.lead==='me')return;
+  const nv=L.lead?+(L.cur+aucStep(L.cur)).toFixed(2):L.cur;
+  if(T(S.me).cash<nv)return toast(`Sem caixa: faltam ${money(nv-T(S.me).cash)}.`);
+  if(sqLen(S.me)>=34)return toast('Elenco cheio (34).');
+  L.cur=nv;L.lead='me';
+  if(aucRivalTurn(L)){L.msg=`Você ofereceu ${money(nv)} · ${T(L.lead).name} cobriu: ${money(L.cur)}. Sua vez.`;aucPaint();return}
+  L.msg=`Ninguém cobre ${money(nv)}. Dou-lhe uma, dou-lhe duas…`;aucSell();
+}
+function aucPass(){
+  const s=S.aucS;if(!s)return;const L=s.lots[s.i];if(!L||L.done||L.lead==='me')return;
+  /* rivais disputam entre si até alguém desistir */
+  let k=0;while(k++<30&&aucRivalTurn(L)){}
+  aucSell();
+}
+
 </script>
-<script>const APPV="50";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="51";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
