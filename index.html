@@ -1782,7 +1782,7 @@ function fire(){
 }
 function takeJob(id){
   const t=T(id);S.coachPool.push(t.coach);news(`${t.coach} deixa o ${t.name}. ${S.coach} é o novo técnico.`);
-  t.coach=S.coach;S.me=id;S.sat=55;S.fired=null;S.fin=null;S.my=[];S.finS={};S.inbox=[];S.auctions=[];S.players.forEach(p=>p.sale=false);
+  t.coach=S.coach;S.me=id;S.sat=55;S.fired=null;S.jobOff=null;S.fin=null;S.my=[];S.finS={};S.inbox=[];S.auctions=[];S.players.forEach(p=>p.sale=false);
   S.lineup={form:'4-2-3-1',tac:'equ',pos:presetPos('4-2-3-1'),xi:[]};S.lineup.xi=elPick(id,"4-4-2");
   UI.tab='clube';UI.tc=null;closeSheet();save();render();toast(`Bem-vindo ao ${t.name}!`);
 }
@@ -2123,7 +2123,9 @@ function seasonEnd(){
   S.sat=clamp(S.sat,0,100);
   const ST1=JSON.parse(JSON.stringify(S.P.ST));const nat=new Set([...A1,...B1,...C1,...D1]);const listed=new Set(Object.values(ST1).flat());
   Object.values(S.teams).forEach(t=>{if(STN[t.reg]&&!nat.has(t.id)&&!listed.has(t.id)&&ST1[t.reg]){ST1[t.reg].push(t.id);if(t.id===S.me)news(`Fora das séries nacionais, o ${t.name} passa a disputar o ${STN[t.reg]}.`)}});
+  const _jp={pos,tg,up:/Acesso/.test(moved||''),tit:myTitles.length};
   nextSeason({A:A1,B:B1,C:C1,D:D1,Dg:D20F?[D1]:regionGroups(D1,6),CB:CB1,LIBg:contGroups(LIB1),SUDg:contGroups(SUD1),NEg:reg('NE'),SSEg:reg('SSE'),VERg:reg('VER'),ST:ST1,EX:S.P.EX});
+  S.jobOff=jobOffers(_jp);
 }
 function nextSeason(P1){
   contractsEndOfSeason();
@@ -2348,6 +2350,7 @@ function render(){
   if(UI.summary){const s=UI.summary;UI.summary=null;openSheet(`Fim da temporada ${s.season}`,`
     ${s.titles.length?`<div class="offer"><p class="tiny" style="font-weight:700">🏆 SEUS TÍTULOS</p><p><b>${s.titles.map(esc).join(' · ')}</b></p></div>`:''}
     ${s.moved?`<p class="${/Acesso|Classificado/.test(s.moved)?'up':'dn'}" style="font-weight:700">${esc(s.moved)}</p>`:''}
+    ${jobOffHTML()}
     <div class="stats"><div class="stat"><small>${esc(s.comp||'Liga')}</small><b>${s.pos}º</b></div><div class="stat"><small>Meta</small><b>${s.tg?'até '+s.tg+'º':'—'}</b></div><div class="stat"><small>Diretoria</small><b>${Math.round(S.sat)}%</b></div></div>
     ${s.lib?'<p class="small up" style="font-weight:600">Vaga na Libertadores do ano que vem!</p>':s.sud?'<p class="small" style="font-weight:600">Vaga na Sul-Americana do ano que vem.</p>':''}
     ${s.tabs?seriesTablesHTML(s.tabs):''}
@@ -2428,7 +2431,7 @@ function renderClube(){
     <div class="stat"><small>Pontos</small><b>${tb.P}</b></div>
     <div class="stat"><small>Saldo</small><b>${tb.GP-tb.GC>0?'+':''}${tb.GP-tb.GC}</b></div>
   </div>`:''}
-  ${aucSessCard()}
+  ${jobOffCard()}${aucSessCard()}
   ${fin?`<button class="card balc" data-a="tab" data-v="gestao"><span>Balanço de ${MESF[fin.mes]}</span><b class="${fin.net>=0?'up':'dn'}">${fin.net>=0?'+':'−'}${money(Math.abs(fin.net))}</b><span class="chev">›</span></button>`:''}
   <div class="card"><div class="card-h"><h3>Competições ${S.season}</h3>${me.last.length?`<div class="form">${me.last.map(r=>`<span class="fm ${r}">${r}</span>`).join('')}</div>`:''}</div>
     ${myComps().map(c=>`<button class="pick" data-a="seecomp" data-v="${c.id}"><span class="info"><span class="nm">${esc(c.n)}</span><span class="mt">${esc(compStatus(c,S.me))}</span></span>${c.champ===S.me?'<span class="st-tag">🏆</span>':''}</button>`).join('')||'<p class="small mute">Seu clube não disputa competições nesta temporada.</p>'}
@@ -3874,7 +3877,38 @@ function aucPass(){
   aucSell();
 }
 
+/* ---------- propostas de emprego no fim da temporada (como no Elifoot) ----------
+   acesso, título ou meta batida chamam a atenção de clubes maiores (mesma divisão ou uma acima) */
+const DVR={A:4,B:3,C:2,D:1};
+const clubSize=id=>(DVR[T(id).div]||0)*100+T(id).rep;
+function jobOffers(r){
+  let sc=(r.tit?2:0)+(r.up?2:0)+(r.tg&&r.pos<=r.tg?1:0)+(r.pos===1?1:0);
+  if(!sc&&R()<.15)sc=0.5;
+  if(!sc)return null;
+  const my=T(S.me),md=DVR[my.div]||0,ms=clubSize(S.me);
+  let c=Object.values(S.teams).filter(t=>t.id!==S.me&&DVR[t.div]&&DVR[t.div]>=md&&DVR[t.div]<=md+1&&clubSize(t.id)>ms).sort((a,b)=>clubSize(a.id)-clubSize(b.id));
+  if(sc<3)c=c.slice(0,14);
+  const n=Math.min(3,Math.max(1,Math.floor(sc)));
+  const ids=shuffle(c.map(t=>t.id)).slice(0,n);
+  if(!ids.length)return null;
+  news(`📨 ${ids.length===1?'Um clube quer':ids.length+' clubes querem'} você como técnico: ${ids.map(id=>T(id).name).join(', ')}.`);
+  return ids;
+}
+function jobOffHTML(){
+  const o=S.jobOff;if(!o||!o.length)return '';
+  return `<div class="offer"><p class="tiny" style="font-weight:700">📨 PROPOSTAS PARA VOCÊ TREINAR OUTRO CLUBE</p>
+    ${o.map(id=>`<button class="pick" data-a="take" data-v="${id}">${crest(id,32)}<span class="info"><span class="nm">${esc(T(id).name)}</span><span class="mt">${divLabel(T(id).div)} · força ${fAvg(teamAvg(id))} · caixa ${money(T(id).cash)}</span></span><span class="st-tag">Assumir</span></button>`).join('')}
+    <div class="row" style="gap:8px;margin-top:6px"><button class="btn sm grow" data-a="jobno">Recusar e ficar no ${esc(T(S.me).name)}</button></div>
+    <p class="tiny mute">As propostas ficam abertas até o fim de janeiro.</p></div>`;
+}
+function jobOffCard(){
+  if(!S.jobOff||!S.jobOff.length)return '';
+  if(S.cal[S.d]&&S.cal[S.d].m>0){S.jobOff=null;return ''}
+  return `<div class="card">${jobOffHTML()}</div>`;
+}
+ACT.jobno=()=>{S.jobOff=null;closeSheet();save();render();toast('Propostas recusadas.')};
+
 </script>
-<script>const APPV="62";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+<script>const APPV="63";if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 function chkV(){fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():null).then(v=>{v=(v||"").trim();if(v&&v!==APPV&&!document.getElementById("updbar")){const d=document.createElement("div");d.id="updbar";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:99;background:#0c8546;color:#fff;border-radius:12px;padding:12px 14px;font:600 14px Barlow,system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)";d.innerHTML='<span style="flex:1">Nova versão do jogo disponível.</span><button style="background:#fff;color:#0c8546;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';d.querySelector("button").onclick=()=>{try{if(typeof save==="function"&&S)save()}catch(e){}location.reload()};document.body.appendChild(d)}}).catch(()=>{})}
 addEventListener("load",chkV);document.addEventListener("visibilitychange",()=>{if(!document.hidden)chkV()});</script></body></html>
